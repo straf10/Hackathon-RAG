@@ -1,82 +1,212 @@
-# Hackathon Thessaloniki 2026 - Challenge 2 Strategy
-## Project: Financial Data Knowledge Base (RAG)
 
-Αυτό το έγγραφο περιγράφει το πλάνο υλοποίησης βάσει των κανόνων του Hackathon PDF.
+---
 
-### 1. Dockerization Strategy (Υποχρεωτικό)
-Σύμφωνα με τη σελίδα 4 και 7, η εφαρμογή **πρέπει** να τρέχει σε Linux environment μέσα σε Docker container. Αν δεν γίνεται compile/run με docker, η συμμετοχή ακυρώνεται.
+# Hackathon Thessaloniki 2026 - Challenge 2: Financial RAG
 
-**Προτεινόμενη Δομή:**
-Επειδή θα χρειαστείτε Backend (RAG logic) και Database (Vector DB), η χρήση του `docker-compose` είναι η βέλτιστη λύση.
+## Αρχιτεκτονική
 
-*   **Dockerfile (για το App):**
-    *   Base Image: `python:3.10-slim` (ή παρόμοιο Linux image).
-    *   Εγκατάσταση dependencies (`requirements.txt`).
-    *   Copy του κώδικα.
-    *   Command για εκκίνηση του server (π.χ. FastAPI/Streamlit).
-*   **docker-compose.yml:**
-    *   **Service 1 (App):** Το δικό σας container.
-    *   **Service 2 (Vector DB):** Π.χ. `chromadb` ή `weaviate` (ΠΡΟΣΟΧΗ: Η σελίδα 4 τονίζει να χρησιμοποιείτε **μόνο official images** από το DockerHub).
+```mermaid
+graph TB
+    subgraph docker [Docker Compose]
+        subgraph frontendSvc [Frontend - Streamlit]
+            UI["Chat UI + Charts + Tables"]
+        end
+        subgraph backendSvc [Backend - FastAPI]
+            API["REST API"]
+            RAG["LlamaIndex RAG Engine"]
+            Ingest["Document Ingestion"]
+            Feedback["Feedback Service"]
+        end
+        subgraph chromaSvc [ChromaDB]
+            VDB["Vector Storage"]
+        end
+        subgraph sqliteSvc [SQLite]
+            FDB["Feedback DB"]
+        end
+    end
 
-### 2. Tech Stack (Βάσει σελίδας 17 & 13)
-Για το Challenge 2 και συγκεκριμένα για Financial RAG, προτείνεται το παρακάτω stack που είναι συμβατό με τους κανόνες:
+    User -->|"Natural Language Query"| UI
+    UI -->|HTTP| API
+    API --> RAG
+    RAG -->|"Semantic Search"| VDB
+    RAG -->|"LLM Call"| OpenAI["OpenAI API gpt-4o"]
+    Ingest -->|"Embed + Store"| VDB
+    Ingest -->|"Parse PDFs"| Data["10-K PDFs"]
+    API --> Feedback
+    Feedback --> FDB
+```
 
-*   **Language:** Python (Προτείνεται έναντι του Node.js λόγω βιβλιοθηκών AI).
-*   **Backend Framework:** FastAPI (γρήγορο, ασύγχρονο) ή Flask.
-*   **Frontend / Visualization:**
-    *   *Επιλογή A (Γρήγορη):* **Streamlit** (Αναφέρεται στη σελ. 13). Ιδανικό για να δείξετε dataframes και charts οικονομικών δεδομένων χωρίς πολύ frontend κώδικα.
-    *   *Επιλογή B (Custom):* React (αν έχετε front-end dev στην ομάδα).
-*   **AI Orchestration:** **LlamaIndex** (ιδανικό για "Search & Retrieval" που ζητάει το challenge) ή **LangChain**.
-*   **Vector Database:** ChromaDB, FAISS ή Weaviate (τρέχουν εύκολα τοπικά με Docker).
-*   **Embeddings:** OpenAI Embeddings (θα δοθούν keys) ή HuggingFace (δωρεάν/open source).
 
-### 3. Επιλογές Dataset (Financial Domain)
-Η σελίδα 4 αναφέρει: *"Use Officially provided public APIs or mock data that you’ve generated or curated."*
 
-Για οικονομικά δεδομένα προτείνουμε:
-1.  **Public APIs:**
-    *   **Yahoo Finance (yfinance library):** Για ιστορικά δεδομένα μετοχών και νέα.
-    *   **Alpha Vantage (Free tier):** Για market data.
-    *   **EDGAR (SEC API):** Για επίσημα reports εταιρειών (10-K, 10-Q filings) -> **Ιδανικό για RAG** (μεγάλα κείμενα προς ανάλυση).
-2.  **Mock Data / Curated:**
-    *   Κατεβάστε 5-10 PDF ετήσιων απολογισμών (π.χ. Tesla, Apple, NVIDIA 2025 reports) και βάλτε τα σε έναν φάκελο `data/` μέσα στο repo. Αυτό θεωρείται "curated data".
+## Tech Stack (ολα δωρεαν εκτος OpenAI key)
 
-### 4. Απαραίτητα Resources
-*   **OpenAI API Keys:** Θα σας σταλούν στο email μετά το Kick-off (σελ. 7).
-*   **GitHub Repository:** Πρέπει να ανεβάσετε τον κώδικα στο repo της Netcompany.
-*   **Docker Desktop:** Για να τεστάρετε το containerization τοπικά.
-*   **Hardware:** Laptop ικανό να τρέξει Docker (η βαριά επεξεργασία γίνεται στο API της OpenAI, οπότε δεν χρειάζεστε GPU τοπικά, εκτός αν τρέξετε local LLMs).
 
-### 5. Βήματα Υλοποίησης (Roadmap)
+| Component | Επιλογη | Γιατι |
+| --------- | ------- | ----- |
 
-**Φάση 1: Setup & Environment (Ημέρα 1)**
-1.  Δημιουργία `git repo`.
-2.  Στήσιμο `docker-compose.yml` με ένα 'hello world' python app και την Vector DB.
-3.  Διασφάλιση ότι τρέχει με `docker-compose up`.
 
-**Φάση 2: Data Ingestion & Indexing (Ο "Πυρήνας" του Challenge 2)**
-1.  Συλλογή δεδομένων (π.χ. PDF financial reports ή News scraping).
-2.  **Chunking:** Χωρισμός κειμένου σε κομμάτια.
-3.  **Embedding:** Δημιουργία vector embeddings και αποθήκευση στη Vector DB.
-4.  *Tip:* Η σελίδα 15 ζητάει *"Ingest and structure knowledge"*. Μην κάνετε απλά text dump. Προσπαθήστε να κρατήσετε metadata (π.χ. Ημερομηνία, Εταιρεία, Τύπος Εγγράφου).
+- **Backend:** Python 3.11 + FastAPI -- Async, γρηγορο, αναφερεται στο challenge
+- **Frontend:** Streamlit -- Ταχυτατο prototyping, built-in charts/tables/chat UI, ιδανικο για financial data
+- **RAG Framework:** LlamaIndex -- Ειδικα σχεδιασμενο για document RAG, εχει built-in PDF readers, chunking strategies, SEC/10-K support
+- **Vector Database:** ChromaDB -- Free, open source, official Docker image, εξαιρετικη Python integration
+- **Embeddings:** OpenAI `text-embedding-3-small` -- Καλυπτεται απο το παρεχομενο API key, κορυφαια ποιοτητα
+- **LLM:** OpenAI `gpt-4o-mini` -- Καλυπτεται απο το key, γρηγορο, φτηνο, καλο reasoning
+- **PDF Parsing:** PyMuPDF (pymupdf) -- Free, γρηγορο, αξιοπιστο parsing
+- **Feedback Storage:** SQLite -- Built-in στην Python, zero config, δωρεαν
+- **Containerization:** Docker + Docker Compose -- Υποχρεωτικο απο το challenge
 
-**Φάση 3: RAG Implementation & Reasoning**
-1.  Σύνδεση με OpenAI API.
-2.  Υλοποίηση του Retrieval: Όταν ρωτάει ο χρήστης, βρες τα σχετικά chunks.
-3.  **Advanced Logic (Σημαντικό για τη βαθμολογία - Σελ. 15):**
-    *   Το σύστημα δεν πρέπει να είναι απλό chatbot.
-    *   Πρέπει να κάνει **Reasoning**. Π.χ. *"Σύγκρινε τα έσοδα του 2024 με το 2025 βάσει των εγγράφων"*.
-    *   *Bonus:* Structured Output (π.χ. επιστροφή αποτελέσματος σε JSON ή πίνακα).
+## Δομη Project
 
-**Φάση 4: User Interface & Feedback Loop**
-1.  Φτιάξτε το UI (π.χ. Streamlit).
-2.  **Requirement (Σελ. 15):** *"Learn from user interactions"*.
-    *   Προσθέστε κουμπιά Like/Dislike στην απάντηση.
-    *   Αποθηκεύστε το feedback (έστω σε ένα local JSON/SQLite) για να δείξετε ότι το σύστημα "μαθαίνει" τη σχετικότητα.
+```
+Hackathon-RAG/
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # FastAPI entrypoint
+│   │   ├── config.py            # Settings (env vars)
+│   │   ├── routers/
+│   │   │   ├── query.py         # POST /query - RAG queries
+│   │   │   ├── ingest.py        # POST /ingest - trigger indexing
+│   │   │   └── feedback.py      # POST /feedback - user feedback
+│   │   ├── services/
+│   │   │   ├── rag_engine.py    # LlamaIndex RAG pipeline
+│   │   │   ├── indexer.py       # Document parsing + embedding
+│   │   │   └── feedback.py      # Feedback storage logic
+│   │   └── models/
+│   │       └── schemas.py       # Pydantic models
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/
+│   ├── app.py                   # Streamlit UI
+│   ├── requirements.txt
+│   └── Dockerfile
+├── data/                        # 10-K PDFs (curated data)
+│   ├── nvidia/
+│   │   ├── nvidia_10k_2024.pdf
+│   │   └── nvidia_10k_2025.pdf
+│   ├── google/
+│   │   ├── google_10k_2024.pdf
+│   │   └── google_10k_2025.pdf
+│   └── apple/
+│       ├── apple_10k_2024.pdf
+│       └── apple_10k_2025.pdf
+├── docker-compose.yml
+├── .env                         # OPENAI_API_KEY
+└── README.md
+```
 
-**Φάση 5: Documentation & Submission**
-1.  Γράψτε το **README.md**:
-    *   Concept Description (Financial Analyst Assistant).
-    *   Setup / Run Instructions (απλά `docker-compose up`).
-    *   Architecture Diagram (Mermaid.js ή εικόνα).
-2.  Ετοιμάστε το Pitching (Video/Presentation) εξηγώντας γιατί η λύση σας δίνει Business Value (Σελ. 9 - 15% βαθμολογίας).
+## Docker Setup (3 services)
+
+**docker-compose.yml** - Τρια services που επικοινωνουν μεσω internal Docker network:
+
+```yaml
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      - chromadb
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8100:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+volumes:
+  chroma_data:
+```
+
+**backend/Dockerfile:**
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+**frontend/Dockerfile:**
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+```
+
+## Φασεις Υλοποιησης
+
+### Φαση 1: Docker + Skeleton (πρωτη προτεραιοτητα)
+
+1. Στησιμο `docker-compose.yml` με τα 3 services
+2. Hello-world FastAPI backend + Streamlit frontend
+3. Verify: `docker-compose up` τρεχει χωρις errors
+
+### Φαση 2: Data Ingestion Pipeline
+
+1. Κατεβασμα 10-K PDFs απο SEC EDGAR (δωρεαν, public) για NVIDIA, Google, Apple (2024-2025)
+2. PDF parsing με PyMuPDF μεσω LlamaIndex `SimpleDirectoryReader`
+3. Chunking με `SentenceSplitter` (chunk_size=1024, overlap=200)
+4. Metadata σε καθε chunk: εταιρεια, ετος, τυπος εγγραφου, section
+5. Embedding με OpenAI `text-embedding-3-small` και αποθηκευση σε ChromaDB
+
+### Φαση 3: RAG Engine + API
+
+1. LlamaIndex `VectorStoreIndex` πανω στο ChromaDB
+2. Query engine με metadata filtering (π.χ. φιλτραρισμα ανα εταιρεια/ετος)
+3. FastAPI endpoints: `/query`, `/ingest`, `/feedback`
+4. **Reasoning capability:** Multi-step queries (π.χ. "Συγκρινε τα εσοδα NVIDIA 2024 vs 2025")
+  - Sub-query decomposition με LlamaIndex `SubQuestionQueryEngine`
+5. Structured output: JSON responses με sources, confidence, extracted entities
+
+### Φαση 4: Streamlit UI
+
+1. Chat interface (st.chat_message) για natural language queries
+2. Sidebar με φιλτρα (εταιρεια, ετος)
+3. Εμφανιση sources/citations κατω απο καθε απαντηση
+4. Like/Dislike buttons σε καθε response
+5. Financial data visualization (charts για συγκρισεις αν ειναι εφικτο)
+
+### Φαση 5: Feedback Loop ("Learn from interactions")
+
+1. SQLite table: query, response, feedback (thumbs up/down), timestamp
+2. Endpoint POST `/feedback` αποθηκευει feedback
+3. Dashboard στο Streamlit που δειχνει feedback stats
+4. Bonus: χρηση feedback για re-ranking (boost chunks με θετικο feedback)
+
+### Φαση 6: Documentation + Submission
+
+1. README.md με setup instructions (`docker-compose up`)
+2. Architecture diagram (Mermaid)
+3. Pitching preparation
+
+## Σημαντικες Σημειωσεις
+
+- **Ολα τα tools ειναι δωρεαν/open-source** εκτος απο OpenAI API (καλυπτεται απο hackathon keys)
+- **Μονο official Docker images** (κανονας challenge σελ. 4)
+- **ChromaDB εχει official image** στο DockerHub: `chromadb/chroma`
+- Τα 10-K PDFs ειναι δημοσια διαθεσιμα στο SEC EDGAR - θεωρουνται "curated data"
+
