@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -12,7 +13,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+# Local: resolve relative to project root; Docker: /app/data via env var
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parents[3] / "data"))
 
 
 def load_pdf_documents(data_dir: Path = DATA_DIR) -> list:

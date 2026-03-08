@@ -80,7 +80,13 @@ docker compose down
 3. Επεξεργάζεται κάθε αρχείο ξεχωριστά — αν κάποιο PDF είναι corrupted, το παρακάμπτει χωρίς να σταματάει
 4. Καταγράφει (logging) πόσα documents παρήχθησαν ανά αρχείο και το σύνολο στο τέλος
 
-**Εκτέλεση standalone:**
+**Εκτέλεση μέσα στο Docker container** (απαιτεί `docker compose up --build`):
+
+```bash
+docker compose exec backend python -m app.services.pdf_parser
+```
+
+**Εκτέλεση τοπικά** (χωρίς Docker, από τον root φάκελο του project):
 
 ```bash
 python -m backend.app.services.pdf_parser
