@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 python-dotenv
 pydantic
+pydantic-settings
 llama-index-core
 llama-index-readers-file
 llama-index-vector-stores-chroma

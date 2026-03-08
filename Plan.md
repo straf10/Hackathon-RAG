@@ -121,13 +121,13 @@ Hackathon-RAG/
   - [x] 2.2.5 Apple 10-K 2024 (SEC EDGAR) **(Completed)**
   - [x] 2.2.6 Apple 10-K 2025 (SEC EDGAR) **(Completed)**
   - [x] 2.2.7 Δημιουργια subfolders `data/nvidia/`, `data/google/`, `data/apple/` **(Completed)**
-- [ ] 2.3 Δημιουργια `backend/app/config.py` με environment settings (OPENAI_API_KEY, CHROMA_HOST, CHROMA_PORT, DATA_DIR)
-- [ ] 2.4 Δημιουργια `backend/app/services/indexer.py`:
-  - [ ] 2.4.1 Φορτωση PDFs μεσω `pdf_parser.load_pdf_documents()`
-  - [ ] 2.4.2 Chunking με LlamaIndex `SentenceSplitter` (chunk_size=1024, overlap=200)
-  - [ ] 2.4.3 Προσθηκη metadata σε καθε chunk: `company`, `year`, `doc_type`, `source_file`
-  - [ ] 2.4.4 Δημιουργια embeddings με OpenAI `text-embedding-3-small`
-  - [ ] 2.4.5 Αποθηκευση vectors στο ChromaDB (μεσω `chromadb` HTTP client -> `CHROMA_HOST:CHROMA_PORT`)
+- [x] 2.3 Δημιουργια `backend/app/config.py` με environment settings (OPENAI_API_KEY, CHROMA_HOST, CHROMA_PORT, DATA_DIR) **(Completed)**
+- [x] 2.4 Δημιουργια `backend/app/services/indexer.py`: **(Completed — e2e test αναμενει API key)**
+  - [x] 2.4.1 Φορτωση PDFs μεσω `pdf_parser.load_pdf_documents()` **(Completed)**
+  - [x] 2.4.2 Chunking με LlamaIndex `SentenceSplitter` (chunk_size=1024, overlap=200) **(Completed — 625 docs → 796 chunks)**
+  - [x] 2.4.3 Προσθηκη metadata σε καθε chunk: `company`, `year`, `doc_type`, `source_file` **(Completed)**
+  - [ ] 2.4.4 Δημιουργια embeddings με OpenAI `text-embedding-3-small` *(αναμενει API key)*
+  - [ ] 2.4.5 Αποθηκευση vectors στο ChromaDB (μεσω `chromadb` HTTP client -> `CHROMA_HOST:CHROMA_PORT`) *(αναμενει API key + Docker)*
 
 ### Φαση 3: RAG Engine + API
 
