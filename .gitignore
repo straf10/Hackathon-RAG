@@ -29,10 +29,6 @@ Thumbs.db
 # Docker
 chroma_data/
 
-# Data (PDFs are large, download separately)
-data/*.pdf
-data/**/*.pdf
-
 # SQLite databases
 *.db
 *.sqlite3
