@@ -33,6 +33,9 @@ chroma_data/
 *.db
 *.sqlite3
 
+# Data — ΔΕΝ αγνοούμε τον φάκελο data/, τα PDFs πρέπει να είναι στο repo
+!data/
+
 # Misc
 *.log
 .cache/

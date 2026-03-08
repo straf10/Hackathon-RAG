@@ -69,20 +69,47 @@ docker compose up --build         # χτίζει και τρέχει τα servic
 docker compose down
 ```
 
+## PDF Parsing — `backend/app/services/pdf_parser.py`
+
+Η συνάρτηση `load_pdf_documents()` διαβάζει όλα τα PDF από τον φάκελο `data/` και τα μετατρέπει σε LlamaIndex `Document` objects.
+
+**Τι κάνει:**
+
+1. Σαρώνει αναδρομικά τον φάκελο `data/` για αρχεία `.pdf`
+2. Χρησιμοποιεί τον `PyMuPDFReader` (μέσω `file_extractor`) αντί του default PDF reader
+3. Επεξεργάζεται κάθε αρχείο ξεχωριστά — αν κάποιο PDF είναι corrupted, το παρακάμπτει χωρίς να σταματάει
+4. Καταγράφει (logging) πόσα documents παρήχθησαν ανά αρχείο και το σύνολο στο τέλος
+
+**Εκτέλεση standalone:**
+
+```bash
+python -m backend.app.services.pdf_parser
+```
+
+**Χρήση ως module:**
+
+```python
+from backend.app.services.pdf_parser import load_pdf_documents
+
+documents = load_pdf_documents()  # -> list[Document]
+```
+
 ## Project Structure
 
 ```
 Hackathon-RAG/
 ├── backend/
 │   ├── app/
-│   │   └── main.py              # FastAPI entrypoint
+│   │   ├── main.py              # FastAPI entrypoint
+│   │   └── services/
+│   │       └── pdf_parser.py    # PDF parsing με PyMuPDFReader
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
 │   ├── app.py                   # Streamlit UI
 │   ├── requirements.txt
 │   └── Dockerfile
-├── data/                        # 10-K PDFs (τοποθετούνται τοπικά)
+├── data/                        # 10-K PDFs (committed στο repo)
 ├── docker-compose.yml
 ├── .env                         # API keys (ΔΕΝ γίνεται commit)
 └── README.md
