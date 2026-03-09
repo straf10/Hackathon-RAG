@@ -37,3 +37,17 @@ class FeedbackRequest(BaseModel):
 class FeedbackResponse(BaseModel):
     status: str
     feedback_id: str
+
+
+class FeedbackStatsResponse(BaseModel):
+    total: int
+    thumbs_up: int
+    thumbs_down: int
+
+
+class FeedbackRecord(BaseModel):
+    feedback_id: str
+    query_id: str
+    rating: str
+    comment: str | None = None
+    created_at: str
