@@ -56,7 +56,7 @@ All documents are publicly available on SEC EDGAR and constitute curated, legall
 - **Only official Docker Hub images** are permitted (per challenge rules, page 4).
 - Base images used:
   - `python:3.12-slim` (official Python image) — backend and frontend containers.
-  - `chromadb/chroma:latest` (official ChromaDB image) — vector database container.
+  - `chromadb/chroma:1.5.2` (official ChromaDB image) — vector database container (pinned for reproducibility).
 
 ### 2.3 External API Keys
 
@@ -78,7 +78,7 @@ All documents are publicly available on SEC EDGAR and constitute curated, legall
 |---------|---------------|---------------|--------------|---------|
 | `backend` | Build: `./backend` | 8000 | 8000 | FastAPI REST API + RAG engine |
 | `frontend` | Build: `./frontend` | 8501 | 8501 | Streamlit chat UI |
-| `chromadb` | `chromadb/chroma:latest` | 8000 | 8100 | Persistent vector storage |
+| `chromadb` | `chromadb/chroma:1.5.2` | 8000 | 8100 | Persistent vector storage |
 
 All services communicate over an internal Docker network. The backend connects to ChromaDB via `CHROMA_HOST:CHROMA_PORT` environment variables. ChromaDB data persists in a named Docker volume (`chroma_data`).
 
@@ -200,7 +200,10 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 | NFR-05 | Performance | Query response latency under 15 seconds for typical single-company questions. | Untested |
 | NFR-06 | Data Integrity | ChromaDB data persisted via named Docker volume (`chroma_data`); survives container restarts. | Done |
 | NFR-07 | Observability | Structured logging across all services for debugging and demo purposes. | Done |
-| NFR-08 | CORS | Backend allows cross-origin requests from the Streamlit frontend container. | Done |
+| NFR-08 | CORS | Backend allows cross-origin requests only from known origins (localhost:8501, 127.0.0.1:8501, frontend:8501). | Done |
+| NFR-09 | Input Validation | Query requests validated: question 1–2000 chars, companies/years max 10 items. | Done |
+| NFR-10 | Budget Enforcement | Token budget ($10) enforced; HTTP 429 when exhausted. | Done |
+| NFR-11 | Concurrency | Ingestion guarded by lock; feedback DB and token tracker use thread-safe singletons. | Done |
 
 ---
 
@@ -212,12 +215,15 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 
 ```json
 {
-  "question": "string (required)",
+  "question": "string (required, 1–2000 chars)",
   "companies": ["string"] | null,
   "years": [integer] | null,
   "use_sub_questions": false
 }
 ```
+
+- `question`: required, min 1 char, max 2000 chars.
+- `companies`, `years`: optional, max 10 items each.
 
 **QueryResponse**
 
@@ -229,11 +235,15 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
       "filename": "string",
       "page": integer,
       "score": float,
-      "text_snippet": "string"
+      "text_snippet": "string",
+      "source_type": "document" | "sub_question"
     }
-  ]
+  ],
+  "query_id": "string (uuid)"
 }
 ```
+
+- `query_id`: server-generated UUID; use when submitting feedback via `POST /feedback`.
 
 **IngestResponse**
 
@@ -241,9 +251,12 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 {
   "status": "string",
   "documents_processed": integer,
-  "chunks_created": integer
+  "chunks_created": integer,
+  "existing_chunks": integer
 }
 ```
+
+- `status`: `ok` (completed), `skipped` (already populated), or `already_running` (concurrent request rejected).
 
 **FeedbackRequest**
 
@@ -270,10 +283,13 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 |--------|------|-------------|---------------|-------------|
 | GET | `/` | — | `{"message": "..."}` | Root health message |
 | GET | `/health` | — | `{"status": "ok"}` | Health check |
-| POST | `/query` | `QueryRequest` | `QueryResponse` | Execute RAG query with optional filters |
-| POST | `/ingest` | — | `IngestResponse` | Trigger document ingestion pipeline |
-| POST | `/feedback` | `FeedbackRequest` | `FeedbackResponse` | Submit user feedback on a response |
-| GET | `/feedback/stats` | — | `FeedbackStatsResponse` | Aggregated feedback statistics (total, positive %, negative %) |
+| GET | `/usage` | — | Token usage + budget | API token counts and estimated cost |
+| POST | `/query` | `QueryRequest` | `QueryResponse` | Execute RAG query (429 if budget exhausted; 422 if validation fails) |
+| POST | `/ingest` | `{"force": bool}` (optional) | `IngestResponse` | Trigger ingestion (returns `already_running` if concurrent) |
+| POST | `/feedback` | `FeedbackRequest` | `FeedbackResponse` | Submit user feedback (use `query_id` from `/query` response) |
+| GET | `/feedback/stats` | — | `FeedbackStatsResponse` | Aggregated feedback statistics |
+| GET | `/feedback/recent` | `?limit=N` (1–100) | `FeedbackRecord[]` | Recent feedback entries |
+| POST | `/shutdown` | — | `{"status": "ok"}` | Persist data before stopping containers |
 
 ---
 
@@ -336,25 +352,25 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
   - [x] Chunking with `SentenceSplitter` (chunk_size=1024, overlap=200) — 625 docs → 796 chunks
   - [x] Metadata enrichment: company, year, doc_type, source_file
   - [x] Embedding generation via OpenAI `text-embedding-3-small` (MockEmbedding fallback)
-  - [x] ChromaDB storage via HTTP client with retry logic
+  - [x] ChromaDB storage via HTTP client with retry logic; concurrency lock prevents duplicate ingestion
 
 ### Phase 3: RAG Engine + API — **Complete**
 
 - [x] RAG engine → `backend/app/services/rag_engine.py`
-  - [x] ChromaDB connection with HTTP client + EphemeralClient fallback
+  - [x] ChromaDB connection with HTTP client + retry logic (5 attempts); raises `ConnectionError` on failure (no silent ephemeral fallback)
   - [x] Standard query engine: natural language → retrieve chunks → LLM synthesis
   - [x] Metadata filtering: company and year via FilterOperator.IN + FilterCondition.AND
   - [x] Sub-question decomposition via `SubQuestionQueryEngine`
   - [x] Structured response: answer + source_nodes (filename, page, score, snippet)
   - [x] MockLLM / MockEmbedding fallback when no valid API key
 - [x] Pydantic schemas → `backend/app/models/schemas.py`
-  - [x] QueryRequest, SourceDocument, QueryResponse, IngestResponse, FeedbackRequest, FeedbackResponse
+  - [x] QueryRequest (question 1–2000 chars, companies/years max 10), SourceDocument, QueryResponse (includes `query_id`), IngestResponse, FeedbackRequest, FeedbackResponse
 - [x] API routers → `backend/app/routers/`
-  - [x] `query.py`: POST `/query` with lazy RAGEngine initialization
-  - [x] `ingest.py`: POST `/ingest` triggers indexer pipeline
-  - [x] `feedback.py`: POST `/feedback` accepts and logs feedback
+  - [x] `query.py`: POST `/query` with lazy RAGEngine init, `asyncio.to_thread` for blocking RAG, budget enforcement, server-side `query_id`
+  - [x] `ingest.py`: POST `/ingest` triggers indexer pipeline (concurrency lock; returns `already_running` if concurrent)
+  - [x] `feedback.py`: POST `/feedback` accepts and logs feedback (sync def for threadpool execution)
 - [x] FastAPI main → `backend/app/main.py`
-  - [x] Router registration, CORS middleware
+  - [x] Router registration, CORS restricted to localhost:8501, 127.0.0.1:8501, frontend:8501
 
 ### Phase 4: Streamlit UI — **Complete**
 
@@ -374,6 +390,7 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 
 - [x] Create `backend/app/services/feedback.py`:
   - [x] SQLite initialization: table `feedback` (feedback_id, query_id, rating, comment, created_at)
+  - [x] Thread-safe singleton connection with double-checked locking; WAL journal mode
   - [x] `save_feedback()` → persist to database
   - [x] `get_feedback_stats()` → aggregated stats (total, positive %, negative %)
   - [x] `get_recent_feedback(limit)` → last N feedback entries
@@ -402,13 +419,13 @@ Hackathon-RAG/
 │   │   ├── main.py                 # FastAPI entrypoint, CORS, router registration
 │   │   ├── config.py               # Environment settings (pydantic-settings)
 │   │   ├── routers/
-│   │   │   ├── query.py            # POST /query — RAG queries with filters
-│   │   │   ├── ingest.py           # POST /ingest — trigger ingestion pipeline
+│   │   │   ├── query.py            # POST /query — RAG queries, budget enforcement, asyncio.to_thread
+│   │   │   ├── ingest.py           # POST /ingest — trigger ingestion pipeline (concurrency lock)
 │   │   │   └── feedback.py         # POST /feedback — user feedback collection
 │   │   ├── services/
 │   │   │   ├── pdf_parser.py       # PyMuPDFReader PDF loading + token counting
-│   │   │   ├── rag_engine.py       # LlamaIndex RAG pipeline + sub-question engine
-│   │   │   ├── indexer.py          # Chunking + embedding + ChromaDB storage
+│   │   │   ├── rag_engine.py       # LlamaIndex RAG pipeline; ChromaDB retry+fail (no ephemeral)
+│   │   │   ├── indexer.py          # Chunking + embedding + ChromaDB (concurrency lock)
 │   │   │   └── feedback.py         # SQLite feedback persistence (Phase 5)
 │   │   └── models/
 │   │       └── schemas.py          # Pydantic request/response models
@@ -458,6 +475,6 @@ Hackathon-RAG/
 |------|-----------|--------|------------|
 | OpenAI API key quota exhausted | Medium | High | MockLLM/MockEmbedding fallback; budget-conscious query batching |
 | Large PDF parsing failures | Low | Medium | Graceful skip per file; structured logging for debugging |
-| ChromaDB container instability | Low | High | Named volume for persistence; EphemeralClient fallback in code |
+| ChromaDB container instability | Low | High | Named volume for persistence; retry logic (5 attempts) with explicit `ConnectionError` on failure; backend fails fast rather than silently using empty ephemeral store |
 | Query latency exceeds acceptable threshold | Medium | Medium | Limit chunk retrieval top-k; use smaller embedding model |
 | Docker build fails on pitch day | Low | Critical | Pre-build and test images day before; push images to registry |

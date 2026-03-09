@@ -47,9 +47,10 @@ graph TB
 - **Explainable Responses** — every answer includes source citations (filename, page number, relevance score, text snippet)
 - **Multi-Step Reasoning** — sub-question decomposition for comparative queries (e.g. *"Compare NVIDIA vs Google revenue"*)
 - **Financial Visualization** — automatic table and bar chart rendering when responses contain numerical data
-- **API Usage Tracking** — token counts and estimated cost via `/usage`; displayed in Streamlit sidebar
+- **API Usage Tracking** — token counts and estimated cost via `/usage`; budget enforcement (HTTP 429 when exhausted)
 - **User Feedback** — thumbs up/down on every response for continuous improvement signals
 - **Graceful Degradation** — MockLLM/MockEmbedding fallback when no OpenAI API key is configured
+- **Input Validation** — question length (1–2000 chars), filter list limits; CORS restricted to known frontend origins
 
 ## Tech Stack
 
@@ -252,8 +253,8 @@ User question + optional filters (company, year)
 | `GET` | `/` | Health message |
 | `GET` | `/health` | Health check (`{"status": "ok"}`) |
 | `GET` | `/usage` | API token usage and estimated cost |
-| `POST` | `/query` | Execute a RAG query with optional filters |
-| `POST` | `/ingest` | Trigger the document ingestion pipeline |
+| `POST` | `/query` | Execute a RAG query with optional filters (429 if budget exhausted; 422 if validation fails) |
+| `POST` | `/ingest` | Trigger the document ingestion pipeline (returns `already_running` if concurrent) |
 | `POST` | `/feedback` | Submit user feedback on a response |
 | `POST` | `/shutdown` | Persist data before stopping containers |
 
@@ -272,6 +273,13 @@ Ask a natural-language question with optional company/year filters.
 }
 ```
 
+| Field | Type | Constraints |
+|-------|------|-------------|
+| `question` | string | Required, 1–2000 characters |
+| `companies` | string[] \| null | Optional, max 10 items |
+| `years` | integer[] \| null | Optional, max 10 items |
+| `use_sub_questions` | boolean | Default: false |
+
 **Response:**
 
 ```json
@@ -284,9 +292,12 @@ Ask a natural-language question with optional company/year filters.
       "score": 0.8721,
       "text_snippet": "Total revenue for the fiscal year ended January 28, 2024..."
     }
-  ]
+  ],
+  "query_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 }
 ```
+
+The `query_id` is generated server-side and should be used when submitting feedback via `POST /feedback`.
 
 **cURL example:**
 
@@ -317,15 +328,21 @@ Triggers the full ingestion pipeline: PDF parsing, chunking, embedding, and Chro
 }
 ```
 
+| Status | Meaning |
+|--------|---------|
+| `ok` | Ingestion completed successfully |
+| `skipped` | Collection already populated; use `force: true` to re-ingest |
+| `already_running` | Another ingestion is in progress; concurrent requests are rejected |
+
 ### `POST /feedback`
 
-Submit a thumbs-up or thumbs-down rating on a query response.
+Submit a thumbs-up or thumbs-down rating on a query response. Use the `query_id` returned by `POST /query` to correlate feedback with the original query.
 
 **Request:**
 
 ```json
 {
-  "query_id": "q-001",
+  "query_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "rating": "up",
   "comment": "Accurate revenue figure with correct source citation"
 }
@@ -350,6 +367,7 @@ Submit a thumbs-up or thumbs-down rating on a query response.
 | `CHROMA_HOST` | `localhost` | ChromaDB hostname. Set to `chromadb` inside Docker. |
 | `CHROMA_PORT` | `8100` | ChromaDB port. Set to `8000` inside Docker (internal port). |
 | `DATA_DIR` | (auto-detected) | Path to the `data/` directory containing 10-K PDFs. Set to `/app/data` in Docker. |
+| `FEEDBACK_DB_DIR` | `feedback_data/` | Path for SQLite feedback DB and token usage JSON. Set to `/app/feedback_data` in Docker. |
 | `BACKEND_URL` | `http://localhost:8000` | Backend URL used by the Streamlit frontend. Set to `http://backend:8000` in Docker. |
 
 All environment variables are configured automatically in `docker-compose.yml`. The only manual step is creating the `.env` file with your OpenAI API key.
@@ -363,7 +381,7 @@ All environment variables are configured automatically in `docker-compose.yml`. 
 1. **Start ChromaDB** (required for vector storage):
 
    ```bash
-   docker run -d -p 8100:8000 -v chroma_data:/data chromadb/chroma:latest
+   docker run -d -p 8100:8000 -v chroma_data:/data chromadb/chroma:1.5.2
    ```
 
 2. **Start the backend:**
@@ -396,7 +414,7 @@ If you only need the API (no UI):
 
 ```bash
 # Terminal 1: ChromaDB
-docker run -d -p 8100:8000 -v chroma_data:/data chromadb/chroma:latest
+docker run -d -p 8100:8000 -v chroma_data:/data chromadb/chroma:1.5.2
 
 # Terminal 2: Backend
 cd backend && pip install -r requirements.txt && uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -455,14 +473,15 @@ Hackathon-RAG/
 │   │   ├── main.py                 # FastAPI entrypoint, CORS, router registration
 │   │   ├── config.py               # Environment settings (pydantic-settings)
 │   │   ├── routers/
-│   │   │   ├── query.py            # POST /query — RAG queries with filters
-│   │   │   ├── ingest.py           # POST /ingest — trigger ingestion pipeline
+│   │   │   ├── query.py            # POST /query — RAG queries, budget enforcement, asyncio.to_thread
+│   │   │   ├── ingest.py           # POST /ingest — trigger ingestion pipeline (concurrency lock)
 │   │   │   ├── usage.py            # GET /usage, POST /shutdown — token tracking
 │   │   │   └── feedback.py         # POST /feedback — user feedback collection
 │   │   ├── services/
 │   │   │   ├── pdf_parser.py       # PyMuPDFReader PDF loading + token counting
-│   │   │   ├── rag_engine.py       # LlamaIndex RAG pipeline + sub-question engine
-│   │   │   └── indexer.py          # Chunking + embedding + ChromaDB storage
+│   │   │   ├── rag_engine.py       # LlamaIndex RAG pipeline, ChromaDB retry+fail (no ephemeral)
+│   │   │   ├── indexer.py          # Chunking + embedding + ChromaDB (concurrency lock)
+│   │   │   └── feedback.py         # SQLite feedback persistence (thread-safe singleton)
 │   │   └── models/
 │   │       └── schemas.py          # Pydantic request/response models
 │   ├── requirements.txt
@@ -488,7 +507,7 @@ Hackathon-RAG/
 |---------|-------|-------|---------|
 | `backend` | Build: `./backend` (python:3.12-slim) | 8000:8000 | FastAPI REST API + RAG engine |
 | `frontend` | Build: `./frontend` (python:3.12-slim) | 8501:8501 | Streamlit chat interface |
-| `chromadb` | `chromadb/chroma:latest` | 8100:8000 | Persistent vector database |
+| `chromadb` | `chromadb/chroma:1.5.2` | 8100:8000 | Persistent vector database |
 
 All services communicate over an internal Docker network. ChromaDB data persists in the `chroma_data` named volume.
 
