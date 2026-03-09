@@ -131,27 +131,28 @@ Hackathon-RAG/
 
 ### Φαση 3: RAG Engine + API
 
-- [ ] 3.1 Δημιουργια `backend/app/services/rag_engine.py`:
-  - [ ] 3.1.1 Συνδεση στο ChromaDB και δημιουργια `VectorStoreIndex`
-  - [ ] 3.1.2 Query engine βασικο: natural language query -> retrieve chunks -> LLM synthesis
-  - [ ] 3.1.3 Metadata filtering: δυνατοτητα φιλτραρισματος ανα εταιρεια και/ή ετος
-  - [ ] 3.1.4 Sub-query decomposition με `SubQuestionQueryEngine` για multi-step reasoning (π.χ. "Συγκρινε εσοδα NVIDIA 2024 vs 2025")
-  - [ ] 3.1.5 Structured response: επιστροφη answer + source_nodes (filename, page, score)
-- [ ] 3.2 Δημιουργια `backend/app/models/schemas.py`:
-  - [ ] 3.2.1 `QueryRequest` (question: str, companies: list[str] | None, years: list[int] | None)
-  - [ ] 3.2.2 `SourceDocument` (filename: str, page: int, score: float, text_snippet: str)
-  - [ ] 3.2.3 `QueryResponse` (answer: str, sources: list[SourceDocument])
-  - [ ] 3.2.4 `IngestResponse` (status: str, documents_processed: int, chunks_created: int)
-  - [ ] 3.2.5 `FeedbackRequest` (query_id: str, rating: str ["up" | "down"], comment: str | None)
-  - [ ] 3.2.6 `FeedbackResponse` (status: str, feedback_id: str)
-- [ ] 3.3 Δημιουργια `backend/app/routers/`:
-  - [ ] 3.3.1 `query.py`: POST `/query` — δεχεται `QueryRequest`, καλει `rag_engine`, επιστρεφει `QueryResponse`
-  - [ ] 3.3.2 `ingest.py`: POST `/ingest` — trigger indexing pipeline, επιστρεφει `IngestResponse`
-  - [ ] 3.3.3 `feedback.py`: POST `/feedback` — αποθηκευει feedback, επιστρεφει `FeedbackResponse`
-- [ ] 3.4 Ενημερωση `backend/app/main.py`:
-  - [ ] 3.4.1 Import και register των 3 routers (query, ingest, feedback)
-  - [ ] 3.4.2 Προσθηκη CORS middleware (για Streamlit -> FastAPI)
-  - [ ] 3.4.3 Startup event: initialize ChromaDB connection + RAG engine
+- [x] 3.1 Δημιουργια `backend/app/services/rag_engine.py`: **(Completed)**
+  - [x] 3.1.1 Συνδεση στο ChromaDB και δημιουργια `VectorStoreIndex` **(Completed)** — HTTP client με fallback σε EphemeralClient
+  - [x] 3.1.2 Query engine βασικο: natural language query -> retrieve chunks -> LLM synthesis **(Completed)**
+  - [x] 3.1.3 Metadata filtering: δυνατοτητα φιλτραρισματος ανα εταιρεια και/ή ετος **(Completed)** — FilterOperator.IN + FilterCondition.AND
+  - [x] 3.1.4 Sub-query decomposition με `SubQuestionQueryEngine` για multi-step reasoning **(Completed)**
+  - [x] 3.1.5 Structured response: επιστροφη answer + source_nodes (filename, page, score) **(Completed)**
+  - [x] 3.1.6 MockLLM / MockEmbedding fallback οταν δεν υπαρχει valid `sk-` API key **(Completed)**
+- [x] 3.2 Δημιουργια `backend/app/models/schemas.py`: **(Completed)**
+  - [x] 3.2.1 `QueryRequest` (question: str, companies: list[str] | None, years: list[int] | None) **(Completed)**
+  - [x] 3.2.2 `SourceDocument` (filename: str, page: int, score: float, text_snippet: str) **(Completed)**
+  - [x] 3.2.3 `QueryResponse` (answer: str, sources: list[SourceDocument]) **(Completed)**
+  - [x] 3.2.4 `IngestResponse` (status: str, documents_processed: int, chunks_created: int) **(Completed)**
+  - [x] 3.2.5 `FeedbackRequest` (query_id: str, rating: Literal["up"|"down"], comment: str | None) **(Completed)**
+  - [x] 3.2.6 `FeedbackResponse` (status: str, feedback_id: str) **(Completed)**
+- [x] 3.3 Δημιουργια `backend/app/routers/`: **(Completed)**
+  - [x] 3.3.1 `query.py`: POST `/query` — δεχεται `QueryRequest`, καλει `rag_engine`, επιστρεφει `QueryResponse` **(Completed)**
+  - [x] 3.3.2 `ingest.py`: POST `/ingest` — trigger indexing pipeline, επιστρεφει `IngestResponse` **(Completed)**
+  - [x] 3.3.3 `feedback.py`: POST `/feedback` — αποθηκευει feedback, επιστρεφει `FeedbackResponse` **(Completed)**
+- [x] 3.4 Ενημερωση `backend/app/main.py`: **(Completed)**
+  - [x] 3.4.1 Import και register των 3 routers (query, ingest, feedback) **(Completed)**
+  - [x] 3.4.2 Προσθηκη CORS middleware (για Streamlit -> FastAPI) **(Completed)**
+  - [x] 3.4.3 RAG engine lazy initialization μεσω query router **(Completed)**
 
 ### Φαση 4: Streamlit UI
 
