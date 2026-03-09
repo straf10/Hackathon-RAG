@@ -1,12 +1,17 @@
 import logging
 import re
+import time
 from pathlib import Path
 
 import chromadb
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
+
+try:
+    from llama_index.core.embeddings.mock_embed_model import MockEmbedding
+except ImportError:
+    from llama_index.core import MockEmbedding  # type: ignore[attr-defined]
 
 from ..config import settings
 from .pdf_parser import load_pdf_documents
@@ -14,6 +19,60 @@ from .pdf_parser import load_pdf_documents
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "financial_10k"
+_EMBED_DIM = 1536
+_CHROMA_MAX_RETRIES = 5
+_CHROMA_RETRY_DELAY = 3
+
+
+def _has_valid_openai_key() -> bool:
+    key = settings.OPENAI_API_KEY
+    return bool(key and key.startswith("sk-"))
+
+
+def _get_embed_model():
+    if _has_valid_openai_key():
+        try:
+            from llama_index.embeddings.openai import OpenAIEmbedding
+
+            return OpenAIEmbedding(
+                model="text-embedding-3-small",
+                api_key=settings.OPENAI_API_KEY,
+            )
+        except ImportError:
+            logger.warning(
+                "llama-index-embeddings-openai not installed — falling back to MockEmbedding"
+            )
+    else:
+        logger.warning("Valid OPENAI_API_KEY not found — falling back to MockEmbedding")
+    return MockEmbedding(embed_dim=_EMBED_DIM)
+
+
+def _connect_chroma(
+    host: str, port: int, collection_name: str
+) -> tuple[chromadb.Collection, chromadb.ClientAPI]:
+    """Connect to ChromaDB with retry logic for startup race conditions."""
+    last_exc: Exception | None = None
+    for attempt in range(1, _CHROMA_MAX_RETRIES + 1):
+        try:
+            client = chromadb.HttpClient(host=host, port=port)
+            collection = client.get_or_create_collection(collection_name)
+            logger.info(
+                "ChromaDB connected at %s:%s (attempt %d, collection=%s, count=%d)",
+                host, port, attempt, collection_name, collection.count(),
+            )
+            return collection, client
+        except Exception as exc:
+            last_exc = exc
+            logger.warning(
+                "ChromaDB connection attempt %d/%d failed (%s:%s): %s — retrying in %ds",
+                attempt, _CHROMA_MAX_RETRIES, host, port, exc, _CHROMA_RETRY_DELAY,
+            )
+            if attempt < _CHROMA_MAX_RETRIES:
+                time.sleep(_CHROMA_RETRY_DELAY)
+
+    raise ConnectionError(
+        f"ChromaDB at {host}:{port} unreachable after {_CHROMA_MAX_RETRIES} attempts"
+    ) from last_exc
 
 
 def _extract_metadata(file_path: str) -> dict:
@@ -46,18 +105,13 @@ def run_ingestion() -> dict:
     nodes = splitter.get_nodes_from_documents(documents)
     logger.info("Created %d chunks from %d documents", len(nodes), len(documents))
 
-    chroma_client = chromadb.HttpClient(
-        host=settings.CHROMA_HOST,
-        port=settings.CHROMA_PORT,
+    chroma_collection, _ = _connect_chroma(
+        settings.CHROMA_HOST, settings.CHROMA_PORT, COLLECTION_NAME,
     )
-    chroma_collection = chroma_client.get_or_create_collection(COLLECTION_NAME)
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
-    embed_model = OpenAIEmbedding(
-        model="text-embedding-3-small",
-        api_key=settings.OPENAI_API_KEY,
-    )
+    embed_model = _get_embed_model()
 
     index = VectorStoreIndex(
         nodes,
