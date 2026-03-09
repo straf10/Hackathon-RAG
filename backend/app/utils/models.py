@@ -6,6 +6,7 @@ Used by rag_engine and indexer to avoid duplication.
 import logging
 
 from ..config import settings
+from .token_tracker import callback_manager
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ def get_embed_model():
             return OpenAIEmbedding(
                 model="text-embedding-3-small",
                 api_key=settings.OPENAI_API_KEY,
+                callback_manager=callback_manager,
             )
         except ImportError:
             logger.warning(
@@ -54,6 +56,7 @@ def get_llm():
                 model="gpt-4.1",
                 api_key=settings.OPENAI_API_KEY,
                 temperature=0.1,
+                callback_manager=callback_manager,
             )
         except ImportError:
             logger.warning(

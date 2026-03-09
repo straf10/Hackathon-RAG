@@ -3,13 +3,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import feedback, ingest, query
+from .routers import feedback, ingest, query, usage
+from .utils.token_tracker import install as install_token_tracking
+from .utils.token_tracker import persist as persist_usage
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    install_token_tracking()
     query.init_engine()
     yield
+    persist_usage()
 
 
 app = FastAPI(title="Financial RAG API", lifespan=lifespan)
@@ -24,6 +28,7 @@ app.add_middleware(
 app.include_router(query.router)
 app.include_router(ingest.router)
 app.include_router(feedback.router)
+app.include_router(usage.router)
 
 
 @app.get("/")

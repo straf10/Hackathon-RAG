@@ -87,6 +87,42 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
+    # ---- API token usage (placeholder — updated after queries) ------------
+    st.divider()
+    _usage_placeholder = st.empty()
+
+
+def _render_usage(container) -> None:
+    """Fetch /usage and render metrics inside the given container."""
+    with container.container():
+        st.subheader("API Usage")
+        try:
+            resp = requests.get(f"{BACKEND_URL}/usage", timeout=5)
+            if resp.status_code == 200:
+                u = resp.json()
+                cost = u.get("estimated_cost_usd", 0)
+                remaining = u.get("budget_remaining_usd", 0)
+                budget = u.get("budget_total_usd", 10)
+
+                col_a, col_b = st.columns(2)
+                col_a.metric("Spent", f"${cost:.4f}")
+                col_b.metric("Remaining", f"${remaining:.2f}")
+                st.progress(min(cost / budget, 1.0) if budget else 0)
+
+                with st.expander("Token details"):
+                    st.markdown(
+                        f"- **LLM prompt:** {u.get('llm_prompt_tokens', 0):,}\n"
+                        f"- **LLM completion:** {u.get('llm_completion_tokens', 0):,}\n"
+                        f"- **Embedding:** {u.get('embedding_tokens', 0):,}"
+                    )
+            else:
+                st.caption("Usage data unavailable")
+        except Exception:
+            st.caption("Usage data unavailable")
+
+
+_render_usage(_usage_placeholder)
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -244,6 +280,8 @@ if prompt := st.chat_input("Ask about 10-K filings…"):
             if df is not None:
                 msg_entry["table"] = df
             st.session_state.messages.append(msg_entry)
+
+            _render_usage(_usage_placeholder)
         else:
             fallback = "Sorry, I couldn't get a response. Please check the backend connection."
             st.warning(fallback)

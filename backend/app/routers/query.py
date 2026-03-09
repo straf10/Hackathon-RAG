@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..models.schemas import QueryRequest, QueryResponse, SourceDocument
 from ..services.rag_engine import RAGEngine
+from ..utils.token_tracker import persist as persist_usage
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,8 @@ async def query(request: QueryRequest):
     except Exception as exc:
         logger.exception("RAG query failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        persist_usage()
 
     sources = [
         SourceDocument(

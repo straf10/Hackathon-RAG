@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..models.schemas import IngestResponse
 from ..services.indexer import run_ingestion
+from ..utils.token_tracker import persist as persist_usage
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,8 @@ async def ingest():
     except Exception as exc:
         logger.exception("Ingestion failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        persist_usage()
 
     return IngestResponse(
         status=result.get("status", "ok"),
