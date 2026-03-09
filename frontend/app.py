@@ -64,6 +64,25 @@ with st.sidebar:
         st.error("Backend unreachable")
 
     st.divider()
+    if st.button("Ingest Documents"):
+        with st.spinner("Ingesting documents…"):
+            try:
+                r = requests.post(f"{BACKEND_URL}/ingest", timeout=300)
+                if r.status_code == 200:
+                    data = r.json()
+                    st.success(
+                        f"Ingested {data.get('documents_processed', 0)} docs, "
+                        f"{data.get('chunks_created', 0)} chunks created."
+                    )
+                else:
+                    st.error(f"Ingestion failed: {r.status_code} — {r.text[:200]}")
+            except requests.ConnectionError:
+                st.error("Cannot reach the backend. Is it running?")
+            except requests.Timeout:
+                st.error("Ingestion timed out.")
+            except Exception as exc:
+                st.error(f"Ingestion failed: {exc}")
+
     if st.button("Clear chat"):
         st.session_state.messages = []
         st.rerun()

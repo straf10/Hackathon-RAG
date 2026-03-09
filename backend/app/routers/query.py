@@ -12,10 +12,13 @@ router = APIRouter()
 _engine: RAGEngine | None = None
 
 
-def get_engine() -> RAGEngine:
+def init_engine() -> None:
     global _engine
-    if _engine is None:
-        _engine = RAGEngine()
+    _engine = RAGEngine()
+
+
+def get_engine() -> RAGEngine:
+    assert _engine is not None, "RAGEngine not initialized (startup failed?)"
     return _engine
 
 

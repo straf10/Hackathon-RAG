@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -8,11 +7,6 @@ import tiktoken
 from llama_index.core import SimpleDirectoryReader
 from llama_index.readers.file import PyMuPDFReader
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(message)s",
-    datefmt="%H:%M:%S",
-)
 logger = logging.getLogger(__name__)
 
 # Local: resolve relative to project root; Docker: /app/data via env var
@@ -21,13 +15,11 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parents[3] /
 
 def load_pdf_documents(data_dir: Path = DATA_DIR) -> list:
     if not data_dir.exists():
-        logger.error("Data directory not found: %s", data_dir)
-        sys.exit(1)
+        raise FileNotFoundError(f"Data directory not found: {data_dir}")
 
     pdf_files = sorted(data_dir.glob("**/*.pdf"))
     if not pdf_files:
-        logger.error("No PDF files found in %s", data_dir)
-        sys.exit(1)
+        raise ValueError(f"No PDF files found in {data_dir}")
 
     logger.info("Found %d PDF file(s) in %s", len(pdf_files), data_dir)
     for f in pdf_files:
@@ -87,5 +79,10 @@ def count_tokens(documents: list, model: str = "text-embedding-3-small") -> dict
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)-7s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
     documents = load_pdf_documents()
     count_tokens(documents)

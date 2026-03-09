@@ -1,9 +1,18 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import feedback, ingest, query
 
-app = FastAPI(title="Financial RAG API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    query.init_engine()
+    yield
+
+
+app = FastAPI(title="Financial RAG API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

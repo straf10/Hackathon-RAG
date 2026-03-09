@@ -40,9 +40,9 @@ class FeedbackResponse(BaseModel):
 
 
 class FeedbackStatsResponse(BaseModel):
-    total: int
-    thumbs_up: int
-    thumbs_down: int
+    total_queries: int
+    positive_percentage: float
+    negative_percentage: float
 
 
 class FeedbackRecord(BaseModel):

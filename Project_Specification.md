@@ -171,9 +171,9 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 | Requirement | Description | Status |
 |-------------|-------------|--------|
 | FR-FDB-01 | Accept feedback per query: `query_id`, `rating` (up/down), optional `comment`. | Done |
-| FR-FDB-02 | Persist feedback to SQLite with timestamp. | **TODO** |
+| FR-FDB-02 | Persist feedback to SQLite with timestamp. | Done |
 | FR-FDB-03 | Return confirmation with generated `feedback_id`. | Done |
-| FR-FDB-04 | Provide aggregated stats endpoint: total queries, positive %, negative %. | **TODO** |
+| FR-FDB-04 | Provide aggregated stats endpoint: total queries, positive %, negative %. | Done |
 
 ### 4.4 Frontend (Streamlit)
 
@@ -185,7 +185,7 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 | FR-UI-04 | Feedback buttons (thumbs up/down) on every assistant response. | Done |
 | FR-UI-05 | Loading spinner during query processing. | Done |
 | FR-UI-06 | (Bonus) Financial data visualization: tables or bar charts when the response contains numerical data. | Done |
-| FR-UI-07 | (Bonus) Analytics dashboard: feedback statistics and recent feedback entries. | **TODO** |
+| FR-UI-07 | (Bonus) Analytics dashboard: feedback statistics and recent feedback entries. | Done |
 
 ---
 
@@ -273,6 +273,7 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 | POST | `/query` | `QueryRequest` | `QueryResponse` | Execute RAG query with optional filters |
 | POST | `/ingest` | — | `IngestResponse` | Trigger document ingestion pipeline |
 | POST | `/feedback` | `FeedbackRequest` | `FeedbackResponse` | Submit user feedback on a response |
+| GET | `/feedback/stats` | — | `FeedbackStatsResponse` | Aggregated feedback statistics (total, positive %, negative %) |
 
 ---
 
@@ -369,16 +370,16 @@ Structured Response ── answer + source_nodes (filename, page, score, snippet
 - [x] Backend health check button
 - [x] Clear chat button
 
-### Phase 5: Feedback Persistence — **In Progress**
+### Phase 5: Feedback Persistence — **Complete**
 
-- [ ] Create `backend/app/services/feedback.py`:
-  - [ ] SQLite initialization: table `feedback` (id, query_id, query_text, response_text, rating, comment, timestamp)
-  - [ ] `save_feedback()` → persist to database
-  - [ ] `get_feedback_stats()` → aggregated stats (total, positive %, negative %)
-  - [ ] `get_recent_feedback(limit)` → last N feedback entries
-- [ ] Wire `routers/feedback.py` to use `services/feedback.py` instead of logging
-- [ ] Add `GET /feedback/stats` endpoint
-- [ ] Analytics dashboard in Streamlit sidebar
+- [x] Create `backend/app/services/feedback.py`:
+  - [x] SQLite initialization: table `feedback` (feedback_id, query_id, rating, comment, created_at)
+  - [x] `save_feedback()` → persist to database
+  - [x] `get_feedback_stats()` → aggregated stats (total, positive %, negative %)
+  - [x] `get_recent_feedback(limit)` → last N feedback entries
+- [x] Wire `routers/feedback.py` to use `services/feedback.py` instead of logging
+- [x] Add `GET /feedback/stats` endpoint
+- [x] Analytics dashboard in Streamlit sidebar → `frontend/pages/Analytics.py`
 
 ### Phase 6: Documentation + Submission — **In Progress**
 

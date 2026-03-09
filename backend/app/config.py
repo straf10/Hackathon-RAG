@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     CHROMA_HOST: str = "localhost"
     CHROMA_PORT: int = 8100
     DATA_DIR: Path = _resolve_data_dir()
+    FEEDBACK_DB_DIR: Path = _resolve_data_dir()
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

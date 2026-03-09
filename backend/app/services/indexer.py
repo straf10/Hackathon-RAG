@@ -8,43 +8,15 @@ from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
-try:
-    from llama_index.core.embeddings.mock_embed_model import MockEmbedding
-except ImportError:
-    from llama_index.core import MockEmbedding  # type: ignore[attr-defined]
-
 from ..config import settings
+from ..utils.models import get_embed_model
 from .pdf_parser import load_pdf_documents
 
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "financial_10k"
-_EMBED_DIM = 1536
 _CHROMA_MAX_RETRIES = 5
 _CHROMA_RETRY_DELAY = 3
-
-
-def _has_valid_openai_key() -> bool:
-    key = settings.OPENAI_API_KEY
-    return bool(key and key.startswith("sk-"))
-
-
-def _get_embed_model():
-    if _has_valid_openai_key():
-        try:
-            from llama_index.embeddings.openai import OpenAIEmbedding
-
-            return OpenAIEmbedding(
-                model="text-embedding-3-small",
-                api_key=settings.OPENAI_API_KEY,
-            )
-        except ImportError:
-            logger.warning(
-                "llama-index-embeddings-openai not installed — falling back to MockEmbedding"
-            )
-    else:
-        logger.warning("Valid OPENAI_API_KEY not found — falling back to MockEmbedding")
-    return MockEmbedding(embed_dim=_EMBED_DIM)
 
 
 def _connect_chroma(
@@ -111,7 +83,7 @@ def run_ingestion() -> dict:
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
-    embed_model = _get_embed_model()
+    embed_model = get_embed_model()
 
     index = VectorStoreIndex(
         nodes,

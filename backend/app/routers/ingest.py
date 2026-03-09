@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -13,7 +14,13 @@ router = APIRouter()
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest():
     try:
-        result = run_ingestion()
+        result = await asyncio.to_thread(run_ingestion)
+    except FileNotFoundError as exc:
+        logger.warning("Ingestion failed: %s", exc)
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        logger.warning("Ingestion failed: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Ingestion failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
