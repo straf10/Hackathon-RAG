@@ -14,6 +14,7 @@ models are created — to wire the callback into ``Settings.callback_manager``.
 
 import json
 import logging
+import threading
 from pathlib import Path
 
 import tiktoken
@@ -34,6 +35,7 @@ _BUDGET_USD = 10.00
 _USAGE_FILE = Path(app_settings.FEEDBACK_DB_DIR) / "token_usage.json"
 
 _historical: dict[str, int] = {"prompt": 0, "completion": 0, "embedding": 0}
+_persist_lock = threading.Lock()
 
 
 def _load_historical() -> None:
@@ -86,22 +88,23 @@ def persist() -> None:
     """Flush in-memory session counters into the historical totals and save
     to disk.  Call this **after** an LLM/embedding operation has completed
     (not while one is in flight) to avoid losing tokens mid-operation."""
-    delta_p = token_counter.prompt_llm_token_count
-    delta_c = token_counter.completion_llm_token_count
-    delta_e = token_counter.total_embedding_token_count
+    with _persist_lock:
+        delta_p = token_counter.prompt_llm_token_count
+        delta_c = token_counter.completion_llm_token_count
+        delta_e = token_counter.total_embedding_token_count
 
-    if not (delta_p or delta_c or delta_e):
-        return
+        if not (delta_p or delta_c or delta_e):
+            return
 
-    _historical["prompt"] += delta_p
-    _historical["completion"] += delta_c
-    _historical["embedding"] += delta_e
-    token_counter.reset_counts()
-    _save_historical()
-    logger.info(
-        "Persisted token usage (+%d prompt, +%d completion, +%d embed)",
-        delta_p, delta_c, delta_e,
-    )
+        _historical["prompt"] += delta_p
+        _historical["completion"] += delta_c
+        _historical["embedding"] += delta_e
+        token_counter.reset_counts()
+        _save_historical()
+        logger.info(
+            "Persisted token usage (+%d prompt, +%d completion, +%d embed)",
+            delta_p, delta_c, delta_e,
+        )
 
 
 def get_usage() -> dict:

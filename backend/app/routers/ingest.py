@@ -17,15 +17,18 @@ async def ingest(request: IngestRequest | None = None):
     force = request.force if request else False
     try:
         result = await asyncio.to_thread(run_ingestion, force)
-    except FileNotFoundError as exc:
-        logger.warning("Ingestion failed: %s", exc)
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        logger.warning("Ingestion failed: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
+    except FileNotFoundError:
+        logger.warning("Ingestion failed: data directory not found")
+        raise HTTPException(status_code=404, detail="Data directory not found.")
+    except ValueError:
+        logger.warning("Ingestion failed: no valid documents")
+        raise HTTPException(status_code=400, detail="No valid PDF documents found.")
+    except Exception:
         logger.exception("Ingestion failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=500,
+            detail="An internal error occurred during ingestion.",
+        )
     finally:
         persist_usage()
 

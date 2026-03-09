@@ -1,5 +1,6 @@
 import logging
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 COLLECTION_NAME = "financial_10k"
 _CHROMA_MAX_RETRIES = 5
 _CHROMA_RETRY_DELAY = 3
+_ingest_lock = threading.Lock()
 
 
 def _connect_chroma(
@@ -67,7 +69,23 @@ def enrich_metadata(documents: list) -> list:
 
 
 def run_ingestion(force: bool = False) -> dict:
-    chroma_collection, _ = _connect_chroma(
+    if not _ingest_lock.acquire(blocking=False):
+        logger.warning("Ingestion already in progress — skipping concurrent request")
+        return {
+            "status": "already_running",
+            "documents_loaded": 0,
+            "chunks_created": 0,
+            "existing_chunks": 0,
+            "collection": COLLECTION_NAME,
+        }
+    try:
+        return _run_ingestion_locked(force)
+    finally:
+        _ingest_lock.release()
+
+
+def _run_ingestion_locked(force: bool) -> dict:
+    chroma_collection, client = _connect_chroma(
         settings.CHROMA_HOST, settings.CHROMA_PORT, COLLECTION_NAME,
     )
     existing_count = chroma_collection.count()
@@ -88,9 +106,6 @@ def run_ingestion(force: bool = False) -> dict:
 
     if existing_count > 0 and force:
         logger.info("Force re-ingest: deleting existing collection '%s'", COLLECTION_NAME)
-        client = chromadb.HttpClient(
-            host=settings.CHROMA_HOST, port=settings.CHROMA_PORT,
-        )
         client.delete_collection(COLLECTION_NAME)
         chroma_collection = client.get_or_create_collection(COLLECTION_NAME)
 

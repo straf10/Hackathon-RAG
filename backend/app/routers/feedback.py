@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.post("/feedback", response_model=FeedbackResponse)
-async def feedback(request: FeedbackRequest):
+def feedback(request: FeedbackRequest):
     feedback_id = str(uuid.uuid4())
     try:
         save_feedback(
@@ -33,7 +33,7 @@ async def feedback(request: FeedbackRequest):
 
 
 @router.get("/feedback/stats", response_model=FeedbackStatsResponse)
-async def feedback_stats():
+def feedback_stats():
     try:
         stats = get_feedback_stats()
     except Exception:
@@ -43,7 +43,7 @@ async def feedback_stats():
 
 
 @router.get("/feedback/recent", response_model=list[FeedbackRecord])
-async def recent_feedback(limit: int = Query(default=20, ge=1, le=100)):
+def recent_feedback(limit: int = Query(default=20, ge=1, le=100)):
     try:
         rows = get_recent_feedback(limit=limit)
     except Exception:

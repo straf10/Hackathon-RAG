@@ -1,10 +1,12 @@
+import asyncio
 import logging
+import uuid
 
 from fastapi import APIRouter, HTTPException
 
 from ..models.schemas import QueryRequest, QueryResponse, SourceDocument
 from ..services.rag_engine import RAGEngine
-from ..utils.token_tracker import persist as persist_usage
+from ..utils.token_tracker import get_usage, persist as persist_usage
 
 logger = logging.getLogger(__name__)
 
@@ -33,17 +35,29 @@ def get_engine() -> RAGEngine:
 
 @router.post("/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
+    usage = get_usage()
+    if usage["budget_remaining_usd"] <= 0:
+        raise HTTPException(
+            status_code=429,
+            detail="Token budget exhausted. No further queries allowed.",
+        )
+
+    query_id = str(uuid.uuid4())
     try:
         engine = get_engine()
-        result = engine.query(
+        result = await asyncio.to_thread(
+            engine.query,
             question=request.question,
             companies=request.companies,
             years=request.years,
             use_sub_questions=request.use_sub_questions,
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("RAG query failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=500,
+            detail="An internal error occurred while processing your query.",
+        )
     finally:
         persist_usage()
 
@@ -67,4 +81,4 @@ async def query(request: QueryRequest):
         for s in result.get("source_nodes", [])
     ]
 
-    return QueryResponse(answer=answer, sources=sources)
+    return QueryResponse(answer=answer, sources=sources, query_id=query_id)

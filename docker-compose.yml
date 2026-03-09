@@ -33,7 +33,7 @@ services:
         condition: service_healthy
 
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:1.5.2
     ports:
       - "8100:8000"
     volumes:

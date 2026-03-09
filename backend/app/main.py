@@ -18,9 +18,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Financial RAG API", lifespan=lifespan)
 
+_ALLOWED_ORIGINS = [
+    "http://localhost:8501",
+    "http://127.0.0.1:8501",
+    "http://frontend:8501",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

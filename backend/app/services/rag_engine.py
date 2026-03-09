@@ -7,6 +7,7 @@ module remains importable and runnable without credentials.
 """
 
 import logging
+import time
 from typing import Optional
 
 import chromadb
@@ -29,6 +30,8 @@ from ..utils.models import get_embed_model, get_llm
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "financial_10k"
+_CHROMA_MAX_RETRIES = 5
+_CHROMA_RETRY_DELAY = 3
 
 
 # ---------------------------------------------------------------------------
@@ -54,33 +57,44 @@ class RAGEngine:
     # -- ChromaDB connection ------------------------------------------------
 
     def _connect(self, host: str, port: int) -> VectorStoreIndex:
-        """Connect to ChromaDB over HTTP and wrap the collection in a
-        ``VectorStoreIndex``.  Falls back to an ephemeral in-memory client
-        when the HTTP server is unreachable (useful for local dev/tests)."""
-        try:
-            client = chromadb.HttpClient(host=host, port=port)
-            collection = client.get_or_create_collection(self.collection_name)
-            logger.info(
-                "ChromaDB connected at %s:%s (collection=%s, count=%d)",
-                host,
-                port,
-                self.collection_name,
-                collection.count(),
-            )
-        except Exception:
-            logger.warning(
-                "ChromaDB HTTP connection failed (%s:%s) — using ephemeral client",
-                host,
-                port,
-            )
-            client = chromadb.EphemeralClient()
-            collection = client.get_or_create_collection(self.collection_name)
+        """Connect to ChromaDB over HTTP with retry logic and wrap the
+        collection in a ``VectorStoreIndex``.  Raises ``ConnectionError``
+        when the server is unreachable after all retries."""
+        last_exc: Exception | None = None
+        for attempt in range(1, _CHROMA_MAX_RETRIES + 1):
+            try:
+                client = chromadb.HttpClient(host=host, port=port)
+                collection = client.get_or_create_collection(self.collection_name)
+                logger.info(
+                    "ChromaDB connected at %s:%s (attempt %d, collection=%s, count=%d)",
+                    host,
+                    port,
+                    attempt,
+                    self.collection_name,
+                    collection.count(),
+                )
+                vector_store = ChromaVectorStore(chroma_collection=collection)
+                return VectorStoreIndex.from_vector_store(
+                    vector_store,
+                    embed_model=self.embed_model,
+                )
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "ChromaDB connection attempt %d/%d failed (%s:%s): %s — retrying in %ds",
+                    attempt,
+                    _CHROMA_MAX_RETRIES,
+                    host,
+                    port,
+                    exc,
+                    _CHROMA_RETRY_DELAY,
+                )
+                if attempt < _CHROMA_MAX_RETRIES:
+                    time.sleep(_CHROMA_RETRY_DELAY)
 
-        vector_store = ChromaVectorStore(chroma_collection=collection)
-        return VectorStoreIndex.from_vector_store(
-            vector_store,
-            embed_model=self.embed_model,
-        )
+        raise ConnectionError(
+            f"ChromaDB at {host}:{port} unreachable after {_CHROMA_MAX_RETRIES} attempts"
+        ) from last_exc
 
     # -- metadata filtering -------------------------------------------------
 
@@ -263,7 +277,7 @@ class RAGEngine:
                     "score": (
                         round(node.score, 4) if node.score is not None else None
                     ),
-                    "text_snippet": text[:300],
+                    "text_snippet": text,
                     "source_type": "sub_question" if is_sub_q else "document",
                 }
             )

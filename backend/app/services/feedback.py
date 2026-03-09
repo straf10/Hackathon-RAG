@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -10,15 +11,20 @@ logger = logging.getLogger(__name__)
 
 _DB_PATH: Path = settings.FEEDBACK_DB_DIR / "feedback.db"
 _conn: sqlite3.Connection | None = None
+_db_lock = threading.Lock()
 
 
 def _get_conn() -> sqlite3.Connection:
     global _conn
-    if _conn is None:
+    if _conn is not None:
+        return _conn
+    with _db_lock:
+        if _conn is not None:
+            return _conn
         _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         _conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
         _conn.row_factory = sqlite3.Row
-        _conn.execute("PRAGMA journal_mode=DELETE")
+        _conn.execute("PRAGMA journal_mode=WAL")
         _conn.execute("PRAGMA foreign_keys=ON")
         _init_tables(_conn)
         logger.info("Feedback database initialised at %s", _DB_PATH)

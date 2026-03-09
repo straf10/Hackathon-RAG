@@ -234,7 +234,7 @@ def _render_sources(sources: list[dict]) -> None:
             for src in docs:
                 score_pct = (
                     f"{src['score'] * 100:.1f}%"
-                    if src.get("score")
+                    if src.get("score") is not None
                     else "N/A"
                 )
                 st.markdown(
@@ -309,7 +309,7 @@ if prompt := st.chat_input("Ask about 10-K filings…"):
         if result is not None:
             answer = result.get("answer", "")
             sources = result.get("sources", [])
-            query_id = str(uuid.uuid4())
+            query_id = result.get("query_id") or str(uuid.uuid4())
 
             st.markdown(_escape_dollars(answer))
 

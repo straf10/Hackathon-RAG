@@ -1,12 +1,12 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class QueryRequest(BaseModel):
-    question: str
-    companies: list[str] | None = None
-    years: list[int] | None = None
+    question: str = Field(..., min_length=1, max_length=2000)
+    companies: list[str] | None = Field(default=None, max_length=10)
+    years: list[int] | None = Field(default=None, max_length=10)
     use_sub_questions: bool = False
 
 
@@ -21,6 +21,7 @@ class SourceDocument(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     sources: list[SourceDocument]
+    query_id: str = ""
 
 
 class IngestRequest(BaseModel):
