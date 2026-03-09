@@ -27,7 +27,7 @@ async def query(request: QueryRequest):
             question=request.question,
             companies=request.companies,
             years=request.years,
-            use_sub_questions=False,
+            use_sub_questions=request.use_sub_questions,
         )
     except Exception as exc:
         logger.exception("RAG query failed")

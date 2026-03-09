@@ -7,6 +7,7 @@ class QueryRequest(BaseModel):
     question: str
     companies: list[str] | None = None
     years: list[int] | None = None
+    use_sub_questions: bool = False
 
 
 class SourceDocument(BaseModel):

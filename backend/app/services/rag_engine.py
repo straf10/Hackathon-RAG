@@ -12,6 +12,7 @@ from typing import Optional
 import chromadb
 from llama_index.core import VectorStoreIndex
 from llama_index.core.query_engine import SubQuestionQueryEngine
+from llama_index.core.question_gen import LLMQuestionGenerator
 from llama_index.core.response_synthesizers import get_response_synthesizer
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.vector_stores import (
@@ -226,9 +227,11 @@ class RAGEngine:
                 ),
             ),
         )
+        question_gen = LLMQuestionGenerator.from_defaults(llm=self.llm)
         return SubQuestionQueryEngine.from_defaults(
             query_engine_tools=[tool],
             llm=self.llm,
+            question_gen=question_gen,
         )
 
     # -- public API ---------------------------------------------------------
@@ -273,18 +276,25 @@ class RAGEngine:
 
         metadata_filters = self._build_filters(companies, years)
 
-        engine = (
-            self._get_sub_question_engine(
-                filters=metadata_filters,
-                similarity_top_k=similarity_top_k,
-            )
-            if use_sub_questions
-            else self._get_query_engine(
-                filters=metadata_filters,
-                similarity_top_k=similarity_top_k,
-            )
-        )
+        if use_sub_questions:
+            try:
+                engine = self._get_sub_question_engine(
+                    filters=metadata_filters,
+                    similarity_top_k=similarity_top_k,
+                )
+                response = engine.query(question)
+                return self._format_response(response)
+            except Exception:
+                logger.warning(
+                    "SubQuestionQueryEngine failed (MockLLM cannot produce "
+                    "structured output) — falling back to standard engine",
+                    exc_info=True,
+                )
 
+        engine = self._get_query_engine(
+            filters=metadata_filters,
+            similarity_top_k=similarity_top_k,
+        )
         response = engine.query(question)
         return self._format_response(response)
 
