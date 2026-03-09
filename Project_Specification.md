@@ -88,7 +88,7 @@ All services communicate over an internal Docker network. The backend connects t
 |-------|-----------|---------------|
 | Backend Framework | Python 3.12 + FastAPI | Async, high-performance, listed in challenge recommendations |
 | RAG Framework | LlamaIndex | Purpose-built for document RAG; native PDF readers, chunking, SEC support |
-| LLM | OpenAI `gpt-4o-mini` | Covered by hackathon API key; fast, cost-effective, strong reasoning |
+| LLM | OpenAI `gpt-4.1` | Covered by hackathon API key; strong reasoning, high accuracy |
 | Embeddings | OpenAI `text-embedding-3-small` | Covered by hackathon API key; high-quality 1536-dim dense vectors |
 | Vector Database | ChromaDB | Free, open-source, official Docker image, excellent Python SDK |
 | PDF Parsing | PyMuPDF (`pymupdf`) | Free, fast, reliable extraction with page-level metadata |
@@ -132,7 +132,7 @@ Semantic Retrieval ── top-k chunks from ChromaDB
 Sub-Question Decomposition ── SubQuestionQueryEngine for multi-step reasoning
     │
     ▼
-LLM Synthesis (gpt-4o-mini) ── grounded answer from retrieved context
+LLM Synthesis (gpt-4.1) ── grounded answer from retrieved context
     │
     ▼
 Structured Response ── answer + source_nodes (filename, page, score, snippet)
@@ -456,7 +456,7 @@ Hackathon-RAG/
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| OpenAI API key quota exhausted | Medium | High | MockLLM/MockEmbedding fallback; use `gpt-4o-mini` (low cost) |
+| OpenAI API key quota exhausted | Medium | High | MockLLM/MockEmbedding fallback; budget-conscious query batching |
 | Large PDF parsing failures | Low | Medium | Graceful skip per file; structured logging for debugging |
 | ChromaDB container instability | Low | High | Named volume for persistence; EphemeralClient fallback in code |
 | Query latency exceeds acceptable threshold | Medium | Medium | Limit chunk retrieval top-k; use smaller embedding model |

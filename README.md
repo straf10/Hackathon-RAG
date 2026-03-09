@@ -28,7 +28,7 @@ graph TB
     UI -->|"HTTP POST /query"| API
     API --> RAG
     RAG -->|"Semantic search<br/>with metadata filtering"| VDB
-    RAG -->|"gpt-4o-mini"| OpenAI["OpenAI API"]
+    RAG -->|"gpt-4.1"| OpenAI["OpenAI API"]
     SubQ -.->|"Multi-step reasoning"| RAG
     Ingest -->|"Embed + store chunks"| VDB
     Ingest -->|"PyMuPDFReader"| Data[("data/<br/>10-K PDFs")]
@@ -56,7 +56,7 @@ graph TB
 |-------|-----------|------|
 | Backend | Python 3.12 + FastAPI | Async REST API |
 | RAG Framework | LlamaIndex | Document ingestion, chunking, retrieval, synthesis |
-| LLM | OpenAI `gpt-4o-mini` | Answer generation from retrieved context |
+| LLM | OpenAI `gpt-4.1` | Answer generation from retrieved context |
 | Embeddings | OpenAI `text-embedding-3-small` | Dense vector generation (1536 dims) |
 | Vector Database | ChromaDB | Persistent vector storage with metadata index |
 | PDF Parsing | PyMuPDF (`pymupdf`) | Page-level text extraction |
@@ -202,7 +202,7 @@ User question + optional filters (company, year)
   (Optional) Sub-Question Decomposition — breaks complex queries into sub-questions
         │
         ▼
-  LLM Synthesis (gpt-4o-mini) — grounded answer from retrieved context only
+  LLM Synthesis (gpt-4.1) — grounded answer from retrieved context only
         │
         ▼
   Structured Response — answer + source citations (filename, page, score, snippet)

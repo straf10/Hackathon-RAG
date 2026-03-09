@@ -51,7 +51,7 @@ def get_llm():
             from llama_index.llms.openai import OpenAI
 
             return OpenAI(
-                model="gpt-4o-mini",
+                model="gpt-4.1",
                 api_key=settings.OPENAI_API_KEY,
                 temperature=0.1,
             )
