@@ -12,6 +12,14 @@ router = APIRouter()
 _engine: RAGEngine | None = None
 
 
+def _safe_int(value) -> int:
+    """Convert *value* to int, returning 0 for anything non-numeric."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return 0
+
+
 def init_engine() -> None:
     global _engine
     _engine = RAGEngine()
@@ -39,7 +47,7 @@ async def query(request: QueryRequest):
     sources = [
         SourceDocument(
             filename=s.get("filename", "unknown"),
-            page=int(s.get("page_label", 0) or 0),
+            page=_safe_int(s.get("page_label", 0)),
             score=s.get("score") or 0.0,
             text_snippet=s.get("text_snippet", ""),
         )
