@@ -15,6 +15,7 @@ class SourceDocument(BaseModel):
     page: int
     score: float
     text_snippet: str
+    source_type: str = "document"
 
 
 class QueryResponse(BaseModel):
@@ -22,10 +23,15 @@ class QueryResponse(BaseModel):
     sources: list[SourceDocument]
 
 
+class IngestRequest(BaseModel):
+    force: bool = False
+
+
 class IngestResponse(BaseModel):
     status: str
     documents_processed: int
     chunks_created: int
+    existing_chunks: int = 0
 
 
 class FeedbackRequest(BaseModel):

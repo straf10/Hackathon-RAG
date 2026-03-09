@@ -10,6 +10,16 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 COMPANIES = ["NVIDIA", "Google", "Apple"]
 YEARS = [2024, 2025]
 
+_SUB_Q_RE = re.compile(
+    r"^Sub question:\s*(?P<question>.+?)\s*Response:\s*(?P<response>.+)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _escape_dollars(text: str) -> str:
+    """Escape bare ``$`` so Streamlit doesn't render them as LaTeX."""
+    return text.replace("$", "\\$")
+
 # ---------------------------------------------------------------------------
 # Page config
 # ---------------------------------------------------------------------------
@@ -64,16 +74,33 @@ with st.sidebar:
         st.error("Backend unreachable")
 
     st.divider()
-    if st.button("Ingest Documents"):
+    ingest_col1, ingest_col2 = st.columns(2)
+    with ingest_col1:
+        ingest_btn = st.button("Ingest Documents")
+    with ingest_col2:
+        force_reingest = st.checkbox("Force re-ingest", value=False)
+
+    if ingest_btn:
         with st.spinner("Ingesting documents…"):
             try:
-                r = requests.post(f"{BACKEND_URL}/ingest", timeout=300)
+                r = requests.post(
+                    f"{BACKEND_URL}/ingest",
+                    json={"force": force_reingest},
+                    timeout=600,
+                )
                 if r.status_code == 200:
                     data = r.json()
-                    st.success(
-                        f"Ingested {data.get('documents_processed', 0)} docs, "
-                        f"{data.get('chunks_created', 0)} chunks created."
-                    )
+                    if data.get("status") == "skipped":
+                        st.info(
+                            f"Documents already ingested "
+                            f"({data.get('existing_chunks', 0)} chunks in database). "
+                            f"Enable **Force re-ingest** to reload."
+                        )
+                    else:
+                        st.success(
+                            f"Ingested {data.get('documents_processed', 0)} docs, "
+                            f"{data.get('chunks_created', 0)} chunks created."
+                        )
                 else:
                     st.error(f"Ingestion failed: {r.status_code} — {r.text[:200]}")
             except requests.ConnectionError:
@@ -90,6 +117,22 @@ with st.sidebar:
     # ---- API token usage (placeholder — updated after queries) ------------
     st.divider()
     _usage_placeholder = st.empty()
+
+    # ---- Shutdown button --------------------------------------------------
+    st.divider()
+    if st.button("Shut Down System", type="primary"):
+        with st.spinner("Saving data and shutting down…"):
+            try:
+                requests.post(f"{BACKEND_URL}/shutdown", timeout=10)
+            except Exception:
+                pass
+        st.session_state.messages = []
+        st.success(
+            "All data has been saved. "
+            "Press **Ctrl+C** in the terminal to stop the containers, "
+            "or run `docker compose down` to shut down completely."
+        )
+        st.stop()
 
 
 def _render_usage(container) -> None:
@@ -169,6 +212,37 @@ _NUM_ROW_RE = re.compile(
 )
 
 
+def _render_sources(sources: list[dict]) -> None:
+    """Render source citations, separating sub-question reasoning steps
+    from actual document sources."""
+    sub_qs = [s for s in sources if s.get("source_type") == "sub_question"]
+    docs = [s for s in sources if s.get("source_type") != "sub_question"]
+
+    if sub_qs:
+        with st.expander(f"Reasoning steps ({len(sub_qs)})"):
+            for i, sq in enumerate(sub_qs, 1):
+                m = _SUB_Q_RE.match(sq.get("text_snippet", ""))
+                if m:
+                    st.markdown(f"**Step {i}:** {_escape_dollars(m['question'])}")
+                    st.caption(_escape_dollars(m["response"]))
+                else:
+                    st.markdown(f"**Step {i}**")
+                    st.caption(_escape_dollars(sq.get("text_snippet", "")))
+
+    if docs:
+        with st.expander(f"Sources ({len(docs)})"):
+            for src in docs:
+                score_pct = (
+                    f"{src['score'] * 100:.1f}%"
+                    if src.get("score")
+                    else "N/A"
+                )
+                st.markdown(
+                    f"**{src['filename']}** · p.{src['page']} · relevance {score_pct}"
+                )
+                st.caption(_escape_dollars(src.get("text_snippet", "")))
+
+
 def _try_extract_table(text: str) -> pd.DataFrame | None:
     """Best-effort extraction of a simple label|value markdown table."""
     matches = _NUM_ROW_RE.findall(text)
@@ -190,18 +264,12 @@ def _try_extract_table(text: str) -> pd.DataFrame | None:
 # ---------------------------------------------------------------------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        st.markdown(_escape_dollars(msg["content"]))
 
         if msg["role"] == "assistant":
             sources = msg.get("sources", [])
             if sources:
-                with st.expander(f"Sources ({len(sources)})"):
-                    for src in sources:
-                        score_pct = f"{src['score'] * 100:.1f}%" if src["score"] else "N/A"
-                        st.markdown(
-                            f"**{src['filename']}** · p.{src['page']} · relevance {score_pct}"
-                        )
-                        st.caption(src["text_snippet"])
+                _render_sources(sources)
 
             df = msg.get("table")
             if df is not None:
@@ -243,16 +311,10 @@ if prompt := st.chat_input("Ask about 10-K filings…"):
             sources = result.get("sources", [])
             query_id = str(uuid.uuid4())
 
-            st.markdown(answer)
+            st.markdown(_escape_dollars(answer))
 
             if sources:
-                with st.expander(f"Sources ({len(sources)})"):
-                    for src in sources:
-                        score_pct = f"{src['score'] * 100:.1f}%" if src["score"] else "N/A"
-                        st.markdown(
-                            f"**{src['filename']}** · p.{src['page']} · relevance {score_pct}"
-                        )
-                        st.caption(src["text_snippet"])
+                _render_sources(sources)
 
             df = _try_extract_table(answer)
             if df is not None:

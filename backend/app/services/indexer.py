@@ -66,7 +66,34 @@ def enrich_metadata(documents: list) -> list:
     return documents
 
 
-def run_ingestion() -> dict:
+def run_ingestion(force: bool = False) -> dict:
+    chroma_collection, _ = _connect_chroma(
+        settings.CHROMA_HOST, settings.CHROMA_PORT, COLLECTION_NAME,
+    )
+    existing_count = chroma_collection.count()
+
+    if existing_count > 0 and not force:
+        logger.info(
+            "Collection '%s' already contains %d chunks — skipping ingestion "
+            "(use force=True to re-ingest)",
+            COLLECTION_NAME, existing_count,
+        )
+        return {
+            "status": "skipped",
+            "documents_loaded": 0,
+            "chunks_created": 0,
+            "existing_chunks": existing_count,
+            "collection": COLLECTION_NAME,
+        }
+
+    if existing_count > 0 and force:
+        logger.info("Force re-ingest: deleting existing collection '%s'", COLLECTION_NAME)
+        client = chromadb.HttpClient(
+            host=settings.CHROMA_HOST, port=settings.CHROMA_PORT,
+        )
+        client.delete_collection(COLLECTION_NAME)
+        chroma_collection = client.get_or_create_collection(COLLECTION_NAME)
+
     logger.info("Loading PDF documents from %s", settings.DATA_DIR)
     documents = load_pdf_documents(settings.DATA_DIR)
 
@@ -77,15 +104,12 @@ def run_ingestion() -> dict:
     nodes = splitter.get_nodes_from_documents(documents)
     logger.info("Created %d chunks from %d documents", len(nodes), len(documents))
 
-    chroma_collection, _ = _connect_chroma(
-        settings.CHROMA_HOST, settings.CHROMA_PORT, COLLECTION_NAME,
-    )
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     embed_model = get_embed_model()
 
-    index = VectorStoreIndex(
+    VectorStoreIndex(
         nodes,
         storage_context=storage_context,
         embed_model=embed_model,

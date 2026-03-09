@@ -47,14 +47,24 @@ async def query(request: QueryRequest):
     finally:
         persist_usage()
 
+    answer = result["answer"]
+    if not answer or answer.strip().lower() in ("empty response", "none", ""):
+        answer = (
+            "I don't have enough information in the ingested 10-K documents "
+            "to answer this question. Try rephrasing, adjusting the company/"
+            "year filters, or asking something related to the financial "
+            "filings (revenue, expenses, risk factors, etc.)."
+        )
+
     sources = [
         SourceDocument(
             filename=s.get("filename", "unknown"),
             page=_safe_int(s.get("page_label", 0)),
             score=s.get("score") or 0.0,
             text_snippet=s.get("text_snippet", ""),
+            source_type=s.get("source_type", "document"),
         )
         for s in result.get("source_nodes", [])
     ]
 
-    return QueryResponse(answer=result["answer"], sources=sources)
+    return QueryResponse(answer=answer, sources=sources)

@@ -45,8 +45,9 @@ graph TB
 
 - **Intelligent Retrieval** — semantic vector search with metadata filtering by company and fiscal year
 - **Explainable Responses** — every answer includes source citations (filename, page number, relevance score, text snippet)
-- **Multi-Step Reasoning** — sub-question decomposition for comparative queries (e.g. "Compare NVIDIA vs Google revenue")
+- **Multi-Step Reasoning** — sub-question decomposition for comparative queries (e.g. *"Compare NVIDIA vs Google revenue"*)
 - **Financial Visualization** — automatic table and bar chart rendering when responses contain numerical data
+- **API Usage Tracking** — token counts and estimated cost via `/usage`; displayed in Streamlit sidebar
 - **User Feedback** — thumbs up/down on every response for continuous improvement signals
 - **Graceful Degradation** — MockLLM/MockEmbedding fallback when no OpenAI API key is configured
 
@@ -79,6 +80,12 @@ All documents are publicly available and committed in the `data/` directory.
 ---
 
 ## Quick Start
+
+| Run mode | Command |
+|----------|---------|
+| **Docker (all services)** | `docker compose up --build` → http://localhost:8501 |
+| **Streamlit (local)** | ChromaDB + backend + `streamlit run app.py` in `frontend/` |
+| **Terminal only** | ChromaDB + backend + `curl -X POST .../query` |
 
 ### Prerequisites
 
@@ -144,7 +151,7 @@ Open http://localhost:8501 and ask questions like:
 - *"What are the main risk factors mentioned in NVIDIA's 10-K?"*
 - *"How did Alphabet's advertising revenue change between 2024 and 2025?"*
 
-Use the sidebar filters to narrow results by company and year. Enable **Sub-question decomposition** for complex comparative queries.
+Use the sidebar filters to narrow results by company and year. Enable **Sub-question decomposition** for complex comparative queries (see [Complex Queries & Sub-Questions](#complex-queries--sub-questions)).
 
 ### Stopping the system
 
@@ -159,6 +166,32 @@ Data persists in the `chroma_data` Docker volume across restarts. To fully reset
 ```bash
 docker compose down -v
 ```
+
+---
+
+## Complex Queries & Sub-Questions
+
+For **comparative or multi-part questions**, enable **Sub-question decomposition** in the sidebar (Streamlit) or set `use_sub_questions: true` in the API. The system breaks your question into simpler sub-questions, retrieves context for each, then synthesizes a single answer.
+
+| Query type | Example | Sub-questions? |
+|------------|---------|----------------|
+| Simple fact | *"What was NVIDIA's revenue in 2024?"* | No |
+| Comparison (2+ companies) | *"Compare NVIDIA vs Google revenue for 2025"* | **Yes** |
+| Multi-year trend | *"How did Apple's net income change from 2024 to 2025?"* | **Yes** |
+| Cross-company + year | *"Which company had higher R&D spend in 2024: NVIDIA or Alphabet?"* | **Yes** |
+
+**Example (API):**
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Compare NVIDIA and Google total revenue for 2024 and 2025",
+    "use_sub_questions": true
+  }'
+```
+
+The response includes a **Reasoning steps** expander showing each sub-question and its answer before the final synthesis.
 
 ---
 
@@ -218,9 +251,11 @@ User question + optional filters (company, year)
 |--------|------|-------------|
 | `GET` | `/` | Health message |
 | `GET` | `/health` | Health check (`{"status": "ok"}`) |
+| `GET` | `/usage` | API token usage and estimated cost |
 | `POST` | `/query` | Execute a RAG query with optional filters |
 | `POST` | `/ingest` | Trigger the document ingestion pipeline |
 | `POST` | `/feedback` | Submit user feedback on a response |
+| `POST` | `/shutdown` | Persist data before stopping containers |
 
 ### `POST /query`
 
@@ -263,15 +298,22 @@ curl -X POST http://localhost:8000/query \
 
 ### `POST /ingest`
 
-Triggers the full ingestion pipeline: PDF parsing, chunking, embedding, and ChromaDB storage.
+Triggers the full ingestion pipeline: PDF parsing, chunking, embedding, and ChromaDB storage. Skips if documents are already indexed unless `force: true` is sent.
+
+**Request (optional):**
+
+```json
+{"force": true}
+```
 
 **Response:**
 
 ```json
 {
   "status": "ok",
-  "documents_processed": 625,
-  "chunks_created": 796
+  "documents_processed": 6,
+  "chunks_created": 796,
+  "existing_chunks": 0
 }
 ```
 
@@ -314,23 +356,57 @@ All environment variables are configured automatically in `docker-compose.yml`. 
 
 ---
 
-## Local Development (without Docker)
+## Running Without Docker
 
-### Backend
+### Option A: Streamlit UI (recommended)
+
+1. **Start ChromaDB** (required for vector storage):
+
+   ```bash
+   docker run -d -p 8100:8000 -v chroma_data:/data chromadb/chroma:latest
+   ```
+
+2. **Start the backend:**
+
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+   ```
+
+3. **Ingest documents** (in a new terminal):
+
+   ```bash
+   curl -X POST http://localhost:8000/ingest
+   ```
+
+4. **Start the Streamlit frontend:**
+
+   ```bash
+   cd frontend
+   pip install -r requirements.txt
+   streamlit run app.py --server.port 8501
+   ```
+
+5. Open **http://localhost:8501** in your browser.
+
+### Option B: Terminal / API only
+
+If you only need the API (no UI):
 
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# Terminal 1: ChromaDB
+docker run -d -p 8100:8000 -v chroma_data:/data chromadb/chroma:latest
+
+# Terminal 2: Backend
+cd backend && pip install -r requirements.txt && uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 3: Ingest, then query
+curl -X POST http://localhost:8000/ingest
+curl -X POST http://localhost:8000/query -H "Content-Type: application/json" -d '{"question":"What was NVIDIA revenue in 2024?"}'
 ```
 
-### Frontend
-
-```bash
-cd frontend
-pip install -r requirements.txt
-streamlit run app.py --server.port 8501
-```
+> **Note:** Set `OPENAI_API_KEY` in `.env` or your environment. Without it, the system uses MockLLM and returns placeholder responses.
 
 ### Testing endpoints locally (PowerShell)
 
@@ -357,6 +433,7 @@ curl http://localhost:8000/health
 
 # Ingest documents
 curl -X POST http://localhost:8000/ingest
+# Force re-ingest: curl -X POST http://localhost:8000/ingest -H "Content-Type: application/json" -d '{"force":true}'
 
 # Query
 curl -X POST http://localhost:8000/query \
@@ -380,6 +457,7 @@ Hackathon-RAG/
 │   │   ├── routers/
 │   │   │   ├── query.py            # POST /query — RAG queries with filters
 │   │   │   ├── ingest.py           # POST /ingest — trigger ingestion pipeline
+│   │   │   ├── usage.py            # GET /usage, POST /shutdown — token tracking
 │   │   │   └── feedback.py         # POST /feedback — user feedback collection
 │   │   ├── services/
 │   │   │   ├── pdf_parser.py       # PyMuPDFReader PDF loading + token counting

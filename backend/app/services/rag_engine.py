@@ -243,6 +243,15 @@ class RAGEngine:
         source_nodes: list[dict] = []
         for node in getattr(response, "source_nodes", []):
             meta = node.metadata or {}
+            has_file = bool(
+                meta.get("source_file") or meta.get("file_name")
+            )
+            text = (node.text or "")[:500]
+            is_sub_q = (
+                not has_file
+                and text.lower().startswith("sub question:")
+            )
+
             source_nodes.append(
                 {
                     "filename": meta.get(
@@ -254,7 +263,8 @@ class RAGEngine:
                     "score": (
                         round(node.score, 4) if node.score is not None else None
                     ),
-                    "text_snippet": (node.text or "")[:300],
+                    "text_snippet": text[:300],
+                    "source_type": "sub_question" if is_sub_q else "document",
                 }
             )
 
