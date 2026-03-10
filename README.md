@@ -275,6 +275,66 @@ All services communicate over an internal Docker network. ChromaDB data persists
 
 ---
 
+## Testing
+
+The backend includes a comprehensive test suite (242 tests) built with **pytest**. Tests run locally without Docker, ChromaDB, or an OpenAI API key — all external dependencies are mocked.
+
+### Run all tests
+
+```bash
+cd backend
+python -m pytest tests/ -v --tb=short
+```
+
+### Run specific test categories
+
+```bash
+# Smoke tests — health, root, usage, shutdown
+python -m pytest tests/test_health.py -v
+
+# Schema validation — all Pydantic models
+python -m pytest tests/test_schemas.py -v
+
+# Query router — API key guard, budget, error handling
+python -m pytest tests/test_query_router.py -v
+
+# Ingestion — ingest endpoint + metadata extraction
+python -m pytest tests/test_ingest_router.py -v
+
+# Feedback — POST/GET feedback endpoints
+python -m pytest tests/test_feedback_router.py -v
+
+# RAG engine — filter building, response formatting
+python -m pytest tests/test_rag_engine.py -v
+
+# Edge cases — null inputs, type mismatches, malformed data
+python -m pytest tests/test_edge_cases.py -v
+
+# E2E integration — real PDF loading, full API flow, contract compliance
+python -m pytest tests/test_e2e_integration.py -v
+
+# Performance — 15-second latency enforcement (NFR-05)
+python -m pytest tests/test_performance.py -v
+```
+
+### Test coverage summary
+
+| Category | File | Tests | What it covers |
+|----------|------|-------|----------------|
+| Smoke | `test_health.py` | 14 | `/`, `/health`, `/usage`, `/shutdown`, 404s |
+| Schemas | `test_schemas.py` | 43 | All 9 Pydantic models: boundaries, nulls, types, round-trips |
+| Query | `test_query_router.py` | 53 | API-key guard, budget, mock detection, OpenAI errors, success |
+| Ingest | `test_ingest_router.py` | 19 | Ingest success/skip/lock, error paths, metadata extraction |
+| Feedback | `test_feedback_router.py` | 17 | Submit, validate, stats, recent, persistence failure |
+| RAG Engine | `test_rag_engine.py` | 18 | Filter building, response formatting, score rounding |
+| Edge Cases | `test_edge_cases.py` | 44 | Malformed JSON, type coercion, filter passthrough, Unicode |
+| E2E | `test_e2e_integration.py` | 25 | Real PDF parsing, chunking, full flow, contract compliance |
+| Performance | `test_performance.py` | 9 | Hard 15s latency limit, simulated delays, endpoint speed |
+
+For detailed test descriptions, audit findings, and the full testing methodology, see [Project_Specification.md §13](Project_Specification.md#13-testing).
+
+---
+
 ## License
 
 Built for Netcompany Hackathon Thessaloniki 2026. All 10-K documents sourced from [SEC EDGAR](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany) (public domain).

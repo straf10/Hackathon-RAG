@@ -362,6 +362,16 @@ Hackathon-RAG/
 │   │   │   └── feedback.py         # SQLite feedback persistence (Phase 5)
 │   │   └── models/
 │   │       └── schemas.py          # Pydantic request/response models
+│   ├── tests/
+│   │   ├── test_health.py          # Smoke tests: /, /health, /usage, /shutdown
+│   │   ├── test_schemas.py         # Pydantic model validation (all 9 schemas)
+│   │   ├── test_query_router.py    # /query endpoint: guards, errors, success
+│   │   ├── test_ingest_router.py   # /ingest endpoint + metadata extraction
+│   │   ├── test_feedback_router.py # /feedback, /feedback/stats, /feedback/recent
+│   │   ├── test_rag_engine.py      # Filter building + response formatting
+│   │   ├── test_edge_cases.py      # Null inputs, type mismatches, malformed data
+│   │   ├── test_e2e_integration.py # Real PDF loading, full API flow, contract compliance
+│   │   └── test_performance.py     # 15s latency enforcement (NFR-05)
 │   ├── requirements.txt
 │   └── Dockerfile                  # python:3.12-slim
 ├── frontend/
@@ -411,3 +421,84 @@ Hackathon-RAG/
 | ChromaDB container instability | Low | High | Named volume for persistence; retry logic (5 attempts) with explicit `ConnectionError` on failure; backend fails fast rather than silently using empty ephemeral store |
 | Query latency exceeds acceptable threshold | Medium | Medium | Limit chunk retrieval top-k; use smaller embedding model |
 | Docker build fails on pitch day | Low | Critical | Pre-build and test images day before; push images to registry |
+
+---
+
+## 13. Testing
+
+### 13.1 Overview
+
+The backend includes **242 automated tests** across 9 test files, all runnable locally without Docker, ChromaDB, or an OpenAI API key. External dependencies are mocked. The test framework is **pytest** (already in `backend/requirements.txt`).
+
+```bash
+cd backend
+python -m pytest tests/ -v --tb=short
+```
+
+### 13.2 Test Files
+
+| File | Tests | Category | Description |
+|------|-------|----------|-------------|
+| `test_health.py` | 14 | Smoke | Verifies `GET /`, `GET /health`, `GET /usage`, `POST /shutdown`, and 404 on unknown routes. Confirms response status codes, JSON structure, content types, and that `/shutdown` triggers persist. |
+| `test_schemas.py` | 43 | Schema Validation | Exercises all 9 Pydantic models (`QueryRequest`, `SourceDocument`, `QueryResponse`, `IngestRequest`, `IngestResponse`, `FeedbackRequest`, `FeedbackResponse`, `FeedbackStatsResponse`, `FeedbackRecord`). Tests field defaults, `min_length`/`max_length` boundaries, `max_length` on list fields, required field rejection, type mismatch rejection, null handling, and JSON round-trip serialization. |
+| `test_query_router.py` | 53 | Query Endpoint | Tests `POST /query` through the full router stack. Covers: no-API-key guard (friendly message, engine not called), budget exhaustion (zero and negative remaining), mock-output safety net (repeated "text" tokens replaced), OpenAI error classification (auth, rate-limit, unknown), successful query (answer + sources), empty-answer replacement, and `use_sub_questions` passthrough (default `True`, explicit `False`). |
+| `test_ingest_router.py` | 19 | Ingestion | Tests `POST /ingest` for success, skipped (already populated), already-running (concurrent lock), and error paths (`FileNotFoundError` → 404, `ValueError` → 400, `RuntimeError` → 500). Also tests `_extract_metadata` against all corpus filename patterns and `enrich_metadata` on fake document objects. |
+| `test_feedback_router.py` | 17 | Feedback | Tests `POST /feedback` (success, comment forwarding, rating forwarding), validation errors (missing `query_id`, missing `rating`, invalid rating, numeric rating, empty body, null body), persistence failure (→ 500), `GET /feedback/stats` (success, zero stats, DB error), and `GET /feedback/recent` (success, empty, multiple records, limit boundaries 0/101 → 422, DB error). |
+| `test_rag_engine.py` | 18 | RAG Internals | Tests `RAGEngine._build_filters` (no filters → `None`, empty lists → `None`, companies-only, years-only, both with AND condition, case lowering, `None` ignored) and `_format_response` (empty response, single doc, sub-question detection, text truncation at 500 chars, `None` score preserved, score rounding to 4 decimals, `file_name` fallback, `unknown` filename, `page` key fallback, missing `source_nodes` attribute). |
+| `test_edge_cases.py` | 44 | Edge Cases | Tests `_safe_int` with 11 type variants (int, string, float, `None`, empty string, non-numeric, list, dict, bool, negative). Tests 12 malformed JSON payloads to `/query` (empty, null, string, array, invalid JSON, null/empty/long question, wrong-type companies/years, over-max lists). Tests filter passthrough, UUID format on `query_id`, mock-output edge cases, source nodes with missing fields, Unicode questions, special characters, float-to-int year coercion, and extra-field ignoring. |
+| `test_e2e_integration.py` | 25 | E2E Integration | Loads **real 10-K PDFs** from `data/` using `load_pdf_documents`, then runs `enrich_metadata` and `SentenceSplitter` on them. Verifies document count, text content, metadata fields (company, year, doc_type, source_file), and chunk inheritance. Simulates the full user journey: `POST /ingest` → `POST /query` → `POST /feedback`, validating every response field against the API contract (§6.1). Tests all 7 endpoint response shapes and parametrizes metadata extraction over all 6 corpus filenames. Auto-skips PDF tests if `data/` is absent. |
+| `test_performance.py` | 9 | Performance (NFR-05) | Enforces the 15-second query latency requirement with hard `assert elapsed < 15.0` assertions. Tests 4 query variants (simple, filtered, 50-source, max-length question). Injects `time.sleep(2)` and `time.sleep(5)` into the mock engine to verify the system stays within budget even with realistic engine delays. Tests `/health`, `/`, and `/usage` for sub-1-second response. |
+
+### 13.3 What the Tests Validate (by Spec Requirement)
+
+| Spec Requirement | Covered By |
+|-----------------|------------|
+| FR-QRY-01: Accept natural-language question | `test_schemas.py::TestQueryRequest`, `test_edge_cases.py::TestQueryMalformedInput` |
+| FR-QRY-02: Optional company/year filters | `test_schemas.py::TestQueryRequest`, `test_edge_cases.py::TestQueryFilterPassthrough` |
+| FR-QRY-04: Sub-question decomposition | `test_query_router.py::TestQuerySuccess` (passthrough True/False) |
+| FR-QRY-06: Structured response | `test_e2e_integration.py::TestResponseContractCompliance`, `test_e2e_integration.py::TestFullApiFlow` |
+| FR-QRY-07: Source documents with metadata | `test_rag_engine.py::TestFormatResponse`, `test_edge_cases.py::TestSourceNodeEdgeCases` |
+| FR-ING-03: Chunk metadata (company, year, doc_type) | `test_ingest_router.py::TestExtractMetadata`, `test_e2e_integration.py::TestRealMetadataEnrichment` |
+| FR-ING-06: Ingestion status | `test_ingest_router.py::TestIngestSuccess`, `TestIngestSkipped`, `TestIngestAlreadyRunning` |
+| FR-ING-07: Skip corrupted PDFs | `test_ingest_router.py::TestIngestErrors` |
+| FR-FDB-01/02/03: Feedback persistence | `test_feedback_router.py::TestFeedbackPost`, `TestFeedbackValidation` |
+| FR-FDB-04: Aggregated stats | `test_feedback_router.py::TestFeedbackStats` |
+| NFR-03: MockLLM/MockEmbedding fallback | `test_query_router.py::TestQueryNoApiKey`, `TestQueryMockOutputSafetyNet` |
+| NFR-05: Query latency < 15s | `test_performance.py::TestQueryLatency`, `TestSimulatedLatency` |
+| NFR-08: CORS configuration | `test_health.py` (app boots with CORS middleware) |
+| NFR-09: Input validation | `test_schemas.py`, `test_edge_cases.py::TestQueryMalformedInput` |
+| NFR-10: Budget enforcement | `test_query_router.py::TestQueryBudgetExhausted` |
+
+### 13.4 Audit Findings
+
+Issues discovered during the test audit process:
+
+| # | Finding | Severity | Resolution |
+|---|---------|----------|------------|
+| 1 | No E2E flow test — the `/ingest` → `/query` → `/feedback` chain was never tested as a sequence | High | Added `TestFullApiFlow` in `test_e2e_integration.py` |
+| 2 | No real PDF tests — `load_pdf_documents` + `enrich_metadata` + `SentenceSplitter` were untested on actual files | High | Added `TestRealPdfLoading`, `TestRealMetadataEnrichment`, `TestRealChunking` |
+| 3 | NFR-05 (15s latency) completely untested | Medium | Added `TestQueryLatency` + `TestSimulatedLatency` with hard assertions |
+| 4 | No response contract validation — tests checked individual fields but never the exact set of keys | Medium | Added `TestResponseContractCompliance` |
+| 5 | Original `test_schemas.py` only tested `use_sub_questions` default — 8 of 9 schemas had zero coverage | Medium | Rewrote `test_schemas.py` with 43 tests covering all models |
+| 6 | No validation boundary tests for `min_length=1`, `max_length=2000`, `max_length=10` | Medium | Added in `test_schemas.py` and `test_edge_cases.py` |
+| 7 | No tests for malformed request bodies (null, array, invalid JSON) | Medium | Added `TestQueryMalformedInput` in `test_edge_cases.py` |
+| 8 | No tests for filter passthrough to engine | Low | Added `TestQueryFilterPassthrough` |
+| 9 | `query_id` UUID format never validated | Low | Added `TestQueryIdPresence` |
+| 10 | Corpus coverage gap — `google-2024.pdf` (hyphen) vs `google_2025.pdf` (underscore) not parametrized | Low | Added `TestCorpusMetadataExtraction` over all 6 files |
+
+### 13.5 Running Tests
+
+```bash
+# All tests
+cd backend
+python -m pytest tests/ -v --tb=short
+
+# Specific category
+python -m pytest tests/test_performance.py -v --tb=short
+
+# E2E + performance only
+python -m pytest tests/test_e2e_integration.py tests/test_performance.py -v --tb=short
+
+# Skip real-PDF tests (if data/ folder is absent)
+python -m pytest tests/ -v -k "not RealPdf and not RealMetadata and not RealChunking"
+```

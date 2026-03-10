@@ -53,12 +53,6 @@ with st.sidebar:
         default=[],
         help="Leave empty to search all years.",
     )
-    use_sub_questions = st.toggle(
-        "Sub-question decomposition",
-        value=False,
-        help="Break complex / comparative queries into sub-questions for multi-step reasoning.",
-    )
-
     st.divider()
 
     if st.button("Check backend health"):
@@ -177,8 +171,7 @@ def _query_backend(question: str) -> dict | None:
         payload["companies"] = [c.lower() for c in selected_companies]
     if selected_years:
         payload["years"] = selected_years
-    if use_sub_questions:
-        payload["use_sub_questions"] = True
+    payload["use_sub_questions"] = True
 
     try:
         resp = requests.post(f"{BACKEND_URL}/query", json=payload, timeout=120)
@@ -187,7 +180,15 @@ def _query_backend(question: str) -> dict | None:
     except requests.ConnectionError:
         st.error("Cannot reach the backend. Is it running?")
     except requests.HTTPError as exc:
-        st.error(f"Backend error: {exc.response.status_code} — {exc.response.text[:300]}")
+        code = exc.response.status_code
+        if code == 429:
+            st.error(
+                "The API token budget has been exhausted — no further queries "
+                "can be processed. Please increase the budget or reset usage "
+                "counters and restart the system."
+            )
+        else:
+            st.error(f"Backend error: {code} — {exc.response.text[:300]}")
     except requests.Timeout:
         st.error("Request timed out. The query may be too complex — try narrowing filters.")
     return None
