@@ -191,7 +191,7 @@ class RAGEngine:
         question: str,
         companies: Optional[list[str]] = None,
         years: Optional[list[int]] = None,
-        use_sub_questions: bool = False,
+        use_sub_questions: bool = True,
         similarity_top_k: int = 5,
     ) -> dict:
         """Run a RAG query against the financial 10-K vector store.
