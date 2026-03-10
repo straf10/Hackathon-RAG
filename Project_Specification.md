@@ -18,28 +18,11 @@ Financial analysts spend hours manually searching through SEC 10-K filings — d
 
 ### 1.2 Proposed Solution
 
-A Retrieval-Augmented Generation (RAG) system that ingests 10-K annual reports from major public companies (NVIDIA, Alphabet/Google, Apple), indexes them at page-level granularity, and answers natural-language financial questions with **grounded, source-cited, explainable responses**.
-
-The system goes beyond simple Q&A by providing:
-
-- **Intelligent retrieval** — semantic search with metadata filtering by company and fiscal year.
-- **Explainable responses** — every answer includes source citations (filename, page number, relevance score, text snippet).
-- **Multi-step reasoning** — sub-question decomposition for comparative and analytical queries.
-- **Feedback loop** — user feedback collection for continuous improvement signals.
-- **Financial visualization** — automatic table and chart rendering for numerical data.
+A Retrieval-Augmented Generation (RAG) system that ingests 10-K annual reports from major public companies (NVIDIA, Alphabet/Google, Apple), indexes them at page-level granularity, and answers natural-language financial questions with grounded, source-cited, explainable responses. See [README — Key Features](README.md#key-features) for the full feature list.
 
 ### 1.3 Target Data Corpus
 
-| Company | Fiscal Year | Source | Format | File |
-|---------|-------------|--------|--------|------|
-| NVIDIA | 2024 | SEC EDGAR | PDF | `nvidia_2024.pdf` |
-| NVIDIA | 2025 | SEC EDGAR | PDF | `nvidia_2025.pdf` |
-| Alphabet (Google) | 2024 | SEC EDGAR | PDF | `google-2024.pdf` |
-| Alphabet (Google) | 2025 | SEC EDGAR | PDF | `google_2025.pdf` |
-| Apple | 2024 | SEC EDGAR | PDF | `apple_2024.pdf` |
-| Apple | 2025 | SEC EDGAR | PDF | `apple_2025.pdf` |
-
-All documents are publicly available on SEC EDGAR and constitute curated, legally public data.
+Six 10-K PDFs from SEC EDGAR (NVIDIA, Alphabet, Apple; FY 2024 and 2025). See [README — Data Corpus](README.md#data-corpus) for the file listing.
 
 ---
 
@@ -72,6 +55,8 @@ All documents are publicly available on SEC EDGAR and constitute curated, legall
 
 ## 3. Technical Architecture
 
+For the architecture diagram, see [README — Architecture](README.md#architecture).
+
 ### 3.1 Services (Docker Compose)
 
 | Service | Image / Build | Internal Port | Exposed Port | Purpose |
@@ -82,61 +67,9 @@ All documents are publicly available on SEC EDGAR and constitute curated, legall
 
 All services communicate over an internal Docker network. The backend connects to ChromaDB via `CHROMA_HOST:CHROMA_PORT` environment variables. ChromaDB data persists in a named Docker volume (`chroma_data`).
 
-### 3.2 Tech Stack
+### 3.2 Tech Stack, Pipelines
 
-| Layer | Technology | Justification |
-|-------|-----------|---------------|
-| Backend Framework | Python 3.12 + FastAPI | Async, high-performance, listed in challenge recommendations |
-| RAG Framework | LlamaIndex | Purpose-built for document RAG; native PDF readers, chunking, SEC support |
-| LLM | OpenAI `gpt-4.1` | Covered by hackathon API key; strong reasoning, high accuracy |
-| Embeddings | OpenAI `text-embedding-3-small` | Covered by hackathon API key; high-quality 1536-dim dense vectors |
-| Vector Database | ChromaDB | Free, open-source, official Docker image, excellent Python SDK |
-| PDF Parsing | PyMuPDF (`pymupdf`) | Free, fast, reliable extraction with page-level metadata |
-| Frontend | Streamlit | Rapid prototyping; built-in chat, charts, tables, data display |
-| Feedback Storage | SQLite | Zero-config, built into Python stdlib, no additional container needed |
-| Containerization | Docker + Docker Compose | Mandatory per challenge rules |
-
-### 3.3 Data Pipeline
-
-```
-10-K PDFs (data/)
-    │
-    ▼
-PyMuPDFReader ── per-page Document extraction
-    │
-    ▼
-SentenceSplitter ── chunk_size=1024, overlap=200
-    │
-    ▼
-Metadata Enrichment ── company, year, doc_type, source_file
-    │
-    ▼
-OpenAI text-embedding-3-small ── dense vector generation
-    │
-    ▼
-ChromaDB ── persistent vector storage with metadata index
-```
-
-### 3.4 Query Pipeline
-
-```
-User Question + optional filters (company, year)
-    │
-    ▼
-Metadata Filter Construction ── FilterOperator.IN + FilterCondition.AND
-    │
-    ▼
-Semantic Retrieval ── top-k chunks from ChromaDB
-    │
-    ▼
-Sub-Question Decomposition ── SubQuestionQueryEngine for multi-step reasoning
-    │
-    ▼
-LLM Synthesis (gpt-4.1) ── grounded answer from retrieved context
-    │
-    ▼
-Structured Response ── answer + source_nodes (filename, page, score, snippet)
-```
+See [README — Tech Stack](README.md#tech-stack) for the technology table. See [README — How It Works](README.md#how-it-works) for the ingestion and query pipeline diagrams.
 
 ---
 
