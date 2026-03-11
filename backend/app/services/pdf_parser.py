@@ -1,5 +1,4 @@
 import logging
-import os
 from collections import defaultdict
 from pathlib import Path
 
@@ -7,13 +6,12 @@ import tiktoken
 from llama_index.core import SimpleDirectoryReader
 from llama_index.readers.file import PyMuPDFReader
 
+from ..config import settings
+
 logger = logging.getLogger(__name__)
 
-# Local: resolve relative to project root; Docker: /app/data via env var
-DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parents[3] / "data"))
 
-
-def load_pdf_documents(data_dir: Path = DATA_DIR) -> list:
+def load_pdf_documents(data_dir: Path = settings.DATA_DIR) -> list:
     if not data_dir.exists():
         raise FileNotFoundError(f"Data directory not found: {data_dir}")
 

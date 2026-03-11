@@ -7,14 +7,10 @@ module remains importable and runnable without credentials.
 """
 
 import logging
-import time
-from typing import Optional
 
-import chromadb
 from llama_index.core import VectorStoreIndex
 from llama_index.core.query_engine import SubQuestionQueryEngine
 from llama_index.core.question_gen import LLMQuestionGenerator
-from llama_index.core.response_synthesizers import get_response_synthesizer
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.vector_stores import (
     FilterCondition,
@@ -25,13 +21,10 @@ from llama_index.core.vector_stores import (
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from ..config import settings
+from ..utils.chroma import COLLECTION_NAME, connect_chroma
 from ..utils.models import get_embed_model, get_llm
 
 logger = logging.getLogger(__name__)
-
-COLLECTION_NAME = "financial_10k"
-_CHROMA_MAX_RETRIES = 5
-_CHROMA_RETRY_DELAY = 3
 
 
 # ---------------------------------------------------------------------------
@@ -57,52 +50,22 @@ class RAGEngine:
     # -- ChromaDB connection ------------------------------------------------
 
     def _connect(self, host: str, port: int) -> VectorStoreIndex:
-        """Connect to ChromaDB over HTTP with retry logic and wrap the
-        collection in a ``VectorStoreIndex``.  Raises ``ConnectionError``
-        when the server is unreachable after all retries."""
-        last_exc: Exception | None = None
-        for attempt in range(1, _CHROMA_MAX_RETRIES + 1):
-            try:
-                client = chromadb.HttpClient(host=host, port=port)
-                collection = client.get_or_create_collection(self.collection_name)
-                logger.info(
-                    "ChromaDB connected at %s:%s (attempt %d, collection=%s, count=%d)",
-                    host,
-                    port,
-                    attempt,
-                    self.collection_name,
-                    collection.count(),
-                )
-                vector_store = ChromaVectorStore(chroma_collection=collection)
-                return VectorStoreIndex.from_vector_store(
-                    vector_store,
-                    embed_model=self.embed_model,
-                )
-            except Exception as exc:
-                last_exc = exc
-                logger.warning(
-                    "ChromaDB connection attempt %d/%d failed (%s:%s): %s — retrying in %ds",
-                    attempt,
-                    _CHROMA_MAX_RETRIES,
-                    host,
-                    port,
-                    exc,
-                    _CHROMA_RETRY_DELAY,
-                )
-                if attempt < _CHROMA_MAX_RETRIES:
-                    time.sleep(_CHROMA_RETRY_DELAY)
-
-        raise ConnectionError(
-            f"ChromaDB at {host}:{port} unreachable after {_CHROMA_MAX_RETRIES} attempts"
-        ) from last_exc
+        """Connect to ChromaDB and wrap the collection in a
+        ``VectorStoreIndex``."""
+        collection, _client = connect_chroma(host, port, self.collection_name)
+        vector_store = ChromaVectorStore(chroma_collection=collection)
+        return VectorStoreIndex.from_vector_store(
+            vector_store,
+            embed_model=self.embed_model,
+        )
 
     # -- metadata filtering -------------------------------------------------
 
     @staticmethod
     def _build_filters(
-        companies: Optional[list[str]] = None,
-        years: Optional[list[int]] = None,
-    ) -> Optional[MetadataFilters]:
+        companies: list[str] | None = None,
+        years: list[int] | None = None,
+    ) -> MetadataFilters | None:
         """Construct metadata filters.
 
         When both ``companies`` and ``years`` are provided the resulting
@@ -139,7 +102,7 @@ class RAGEngine:
 
     def _get_query_engine(
         self,
-        filters: Optional[MetadataFilters] = None,
+        filters: MetadataFilters | None = None,
         similarity_top_k: int = 5,
     ):
         """Build a standard single-step query engine with optional
@@ -154,7 +117,7 @@ class RAGEngine:
 
     def _get_sub_question_engine(
         self,
-        filters: Optional[MetadataFilters] = None,
+        filters: MetadataFilters | None = None,
         similarity_top_k: int = 5,
     ):
         """``SubQuestionQueryEngine`` decomposes a complex question into
@@ -189,8 +152,8 @@ class RAGEngine:
     def query(
         self,
         question: str,
-        companies: Optional[list[str]] = None,
-        years: Optional[list[int]] = None,
+        companies: list[str] | None = None,
+        years: list[int] | None = None,
         use_sub_questions: bool = True,
         similarity_top_k: int = 5,
     ) -> dict:

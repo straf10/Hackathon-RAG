@@ -99,7 +99,6 @@ async def query(request: QueryRequest):
             use_sub_questions=request.use_sub_questions,
         )
     except Exception as exc:
-        persist_usage()
         friendly = _classify_openai_error(exc)
         if friendly:
             logger.warning("OpenAI API error: %s", exc)

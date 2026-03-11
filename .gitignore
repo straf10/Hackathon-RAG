@@ -31,6 +31,8 @@ chroma_data/
 
 # SQLite databases
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
 
 # Data — ΔΕΝ αγνοούμε τον φάκελο data/, τα PDFs πρέπει να είναι στο repo

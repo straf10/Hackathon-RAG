@@ -1,4 +1,3 @@
-import os
 import re
 import uuid
 
@@ -6,7 +5,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+from config import BACKEND_URL
 COMPANIES = ["NVIDIA", "Google", "Apple"]
 YEARS = [2024, 2025]
 
@@ -206,6 +205,26 @@ def _send_feedback(query_id: str, rating: str) -> None:
         pass
 
 
+def _render_feedback_buttons(query_id: str) -> None:
+    """Render thumbs-up / thumbs-down feedback buttons for a response."""
+    fb_key = f"fb_{query_id}"
+    if fb_key not in st.session_state:
+        st.session_state[fb_key] = None
+
+    col1, col2, _ = st.columns([1, 1, 10])
+    with col1:
+        if st.button("\U0001f44d", key=f"up_{query_id}"):
+            _send_feedback(query_id, "up")
+            st.session_state[fb_key] = "up"
+    with col2:
+        if st.button("\U0001f44e", key=f"down_{query_id}"):
+            _send_feedback(query_id, "down")
+            st.session_state[fb_key] = "down"
+
+    if st.session_state.get(fb_key):
+        st.caption(f"Feedback recorded: {st.session_state[fb_key]}")
+
+
 _SEPARATOR_RE = re.compile(r"^\|?[\s\-:]+\|[\s\-:|]*$")
 
 _NUM_ROW_RE = re.compile(
@@ -315,23 +334,7 @@ for msg in st.session_state.messages:
                 st.table(df)
                 st.bar_chart(df.set_index("Label"))
 
-            qid = msg.get("query_id", "")
-            fb_key = f"fb_{qid}"
-            if fb_key not in st.session_state:
-                st.session_state[fb_key] = None
-
-            col1, col2, _ = st.columns([1, 1, 10])
-            with col1:
-                if st.button("👍", key=f"up_{qid}"):
-                    _send_feedback(qid, "up")
-                    st.session_state[fb_key] = "up"
-            with col2:
-                if st.button("👎", key=f"down_{qid}"):
-                    _send_feedback(qid, "down")
-                    st.session_state[fb_key] = "down"
-
-            if st.session_state.get(fb_key):
-                st.caption(f"Feedback recorded: {st.session_state[fb_key]}")
+            _render_feedback_buttons(msg.get("query_id", ""))
 
 # ---------------------------------------------------------------------------
 # Chat input
@@ -360,17 +363,7 @@ if prompt := st.chat_input("Ask about 10-K filings…"):
                 st.table(df)
                 st.bar_chart(df.set_index("Label"))
 
-            fb_key = f"fb_{query_id}"
-            st.session_state[fb_key] = None
-            col1, col2, _ = st.columns([1, 1, 10])
-            with col1:
-                if st.button("👍", key=f"up_{query_id}"):
-                    _send_feedback(query_id, "up")
-                    st.session_state[fb_key] = "up"
-            with col2:
-                if st.button("👎", key=f"down_{query_id}"):
-                    _send_feedback(query_id, "down")
-                    st.session_state[fb_key] = "down"
+            _render_feedback_buttons(query_id)
 
             msg_entry = {
                 "role": "assistant",

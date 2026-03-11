@@ -3,12 +3,10 @@ Analytics dashboard — displays feedback stats from the backend.
 FR-UI-07: Total Queries, Positive %, Negative %.
 """
 
-import os
-
 import requests
 import streamlit as st
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+from config import BACKEND_URL
 
 st.set_page_config(page_title="Analytics — PageIndex RAG", page_icon="📈", layout="wide")
 st.title("Feedback Analytics")
