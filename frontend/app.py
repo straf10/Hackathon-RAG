@@ -33,101 +33,8 @@ if "backend_ok" not in st.session_state:
     st.session_state.backend_ok = None
 if "_ingest_settled" not in st.session_state:
     st.session_state._ingest_settled = False
-
-# ---------------------------------------------------------------------------
-# Sidebar — filters & settings
-# ---------------------------------------------------------------------------
-with st.sidebar:
-    st.header("PageIndex RAG")
-    st.caption("10-K Financial Knowledge Base")
-    st.divider()
-
-    selected_companies = st.multiselect(
-        "Companies",
-        options=COMPANIES,
-        default=[],
-        help="Leave empty to search all companies.",
-    )
-    selected_years = st.multiselect(
-        "Years",
-        options=YEARS,
-        default=[],
-        help="Leave empty to search all years.",
-    )
-    st.divider()
-
-    if st.button("Check backend health"):
-        try:
-            r = requests.get(f"{BACKEND_URL}/health", timeout=5)
-            st.session_state.backend_ok = r.status_code == 200
-        except requests.ConnectionError:
-            st.session_state.backend_ok = False
-
-    if st.session_state.backend_ok is True:
-        st.success("Backend connected")
-    elif st.session_state.backend_ok is False:
-        st.error("Backend unreachable")
-
-    st.divider()
-    ingest_col1, ingest_col2 = st.columns(2)
-    with ingest_col1:
-        ingest_btn = st.button("Ingest Documents")
-    with ingest_col2:
-        force_reingest = st.checkbox("Force re-ingest", value=False)
-
-    if ingest_btn:
-        with st.spinner("Ingesting documents…"):
-            try:
-                r = requests.post(
-                    f"{BACKEND_URL}/ingest",
-                    json={"force": force_reingest},
-                    timeout=600,
-                )
-                if r.status_code == 200:
-                    data = r.json()
-                    if data.get("status") == "skipped":
-                        st.info(
-                            f"Documents already ingested "
-                            f"({data.get('existing_chunks', 0)} chunks in database). "
-                            f"Enable **Force re-ingest** to reload."
-                        )
-                    else:
-                        st.success(
-                            f"Ingested {data.get('documents_processed', 0)} docs, "
-                            f"{data.get('chunks_created', 0)} chunks created."
-                        )
-                else:
-                    st.error(f"Ingestion failed: {r.status_code} — {r.text[:200]}")
-            except requests.ConnectionError:
-                st.error("Cannot reach the backend. Is it running?")
-            except requests.Timeout:
-                st.error("Ingestion timed out.")
-            except Exception as exc:
-                st.error(f"Ingestion failed: {exc}")
-
-    if st.button("Clear chat"):
-        st.session_state.messages = []
-        st.rerun()
-
-    # ---- API token usage (placeholder — updated after queries) ------------
-    st.divider()
-    _usage_placeholder = st.empty()
-
-    # ---- Shutdown button --------------------------------------------------
-    st.divider()
-    if st.button("Shut Down System", type="primary"):
-        with st.spinner("Saving data and shutting down…"):
-            try:
-                requests.post(f"{BACKEND_URL}/shutdown", timeout=10)
-            except Exception:
-                pass
-        st.session_state.messages = []
-        st.success(
-            "All data has been saved. "
-            "Press **Ctrl+C** in the terminal to stop the containers, "
-            "or run `docker compose down` to shut down completely."
-        )
-        st.stop()
+if "usage_baseline_cost" not in st.session_state:
+    st.session_state.usage_baseline_cost = 0.0
 
 
 def _render_usage(container) -> None:
@@ -139,13 +46,15 @@ def _render_usage(container) -> None:
             if resp.status_code == 200:
                 u = resp.json()
                 cost = u.get("estimated_cost_usd", 0)
-                remaining = u.get("budget_remaining_usd", 0)
                 budget = u.get("budget_total_usd", 10)
+                baseline = st.session_state.get("usage_baseline_cost", 0.0)
+                adj_cost = max(cost - baseline, 0.0)
+                adj_remaining = max(budget - adj_cost, 0.0)
 
                 col_a, col_b = st.columns(2)
-                col_a.metric("Spent", f"${cost:.4f}")
-                col_b.metric("Remaining", f"${remaining:.2f}")
-                st.progress(min(cost / budget, 1.0) if budget else 0)
+                col_a.metric("Spent (since reset)", f"${adj_cost:.4f}")
+                col_b.metric("Remaining", f"${adj_remaining:.2f}")
+                st.progress(min(adj_cost / budget, 1.0) if budget else 0)
 
                 with st.expander("Token details"):
                     st.markdown(
@@ -159,20 +68,13 @@ def _render_usage(container) -> None:
             st.caption("Usage data unavailable")
 
 
-_render_usage(_usage_placeholder)
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _query_backend(question: str) -> dict | None:
     """POST to /query and return the JSON response, or None on failure."""
-    payload: dict = {"question": question}
-    if selected_companies:
-        payload["companies"] = [c.lower() for c in selected_companies]
-    if selected_years:
-        payload["years"] = selected_years
-    payload["use_sub_questions"] = True
+    payload: dict = {"question": question, "use_sub_questions": True}
 
     try:
         resp = requests.post(f"{BACKEND_URL}/query", json=payload, timeout=120)
@@ -191,7 +93,7 @@ def _query_backend(question: str) -> dict | None:
         else:
             st.error(f"Backend error: {code} — {exc.response.text[:300]}")
     except requests.Timeout:
-        st.error("Request timed out. The query may be too complex — try narrowing filters.")
+        st.error("Request timed out. The query may be too complex — try simplifying or rephrasing the question.")
     return None
 
 
@@ -343,6 +245,102 @@ def _ingestion_status_banner():
 _ingestion_status_banner()
 
 # ---------------------------------------------------------------------------
+# Main header, settings gear, and usage metrics
+# ---------------------------------------------------------------------------
+col_title, col_gear = st.columns([12, 1])
+with col_title:
+    st.header("PageIndex RAG — 10-K Analysis")
+    st.caption("10-K Financial Knowledge Base")
+
+with col_gear:
+    with st.popover("⚙ Settings", use_container_width=True):
+        st.caption("Advanced controls")
+
+        if st.button("Check backend health", key="btn_check_health"):
+            try:
+                r = requests.get(f"{BACKEND_URL}/health", timeout=5)
+                st.session_state.backend_ok = r.status_code == 200
+            except requests.ConnectionError:
+                st.session_state.backend_ok = False
+
+        if st.session_state.backend_ok is True:
+            st.success("Backend connected")
+        elif st.session_state.backend_ok is False:
+            st.error("Backend unreachable")
+
+        st.divider()
+        force_reingest = st.checkbox(
+            "Force re-ingest",
+            value=False,
+            key="chk_force_reingest",
+            help="Rebuild the index even if documents were already ingested.",
+        )
+        if st.button("Run ingestion", key="btn_run_ingest"):
+            with st.spinner("Ingesting documents…"):
+                try:
+                    r = requests.post(
+                        f"{BACKEND_URL}/ingest",
+                        json={"force": force_reingest},
+                        timeout=600,
+                    )
+                    if r.status_code == 200:
+                        data = r.json()
+                        if data.get("status") == "skipped":
+                            st.info(
+                                f"Documents already ingested "
+                                f"({data.get('existing_chunks', 0)} chunks in database). "
+                                f"Enable **Force re-ingest** to reload."
+                            )
+                        else:
+                            st.success(
+                                f"Ingested {data.get('documents_processed', 0)} docs, "
+                                f"{data.get('chunks_created', 0)} chunks created."
+                            )
+                    else:
+                        st.error(f"Ingestion failed: {r.status_code} — {r.text[:200]}")
+                except requests.ConnectionError:
+                    st.error("Cannot reach the backend. Is it running?")
+                except requests.Timeout:
+                    st.error("Ingestion timed out.")
+                except Exception as exc:
+                    st.error(f"Ingestion failed: {exc}")
+
+        st.divider()
+        if st.button("Reset usage baseline", key="btn_reset_usage"):
+            try:
+                resp = requests.get(f"{BACKEND_URL}/usage", timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    st.session_state.usage_baseline_cost = data.get("estimated_cost_usd", 0.0)
+                    st.success("Usage metrics reset. Totals are now counted from this point.")
+                else:
+                    st.error("Unable to retrieve usage data to reset.")
+            except Exception:
+                st.error("Failed to reset usage metrics.")
+
+        st.divider()
+        if st.button("Clear chat history", key="btn_clear_chat"):
+            st.session_state.messages = []
+            st.rerun()
+
+        if st.button("Shut Down System", type="primary", key="btn_shutdown"):
+            with st.spinner("Saving data and shutting down…"):
+                try:
+                    requests.post(f"{BACKEND_URL}/shutdown", timeout=10)
+                except Exception:
+                    pass
+            st.session_state.messages = []
+            st.success(
+                "All data has been saved. "
+                "Press **Ctrl+C** in the terminal to stop the containers, "
+                "or run `docker compose down` to shut down completely."
+            )
+            st.stop()
+
+usage_container = st.container()
+_render_usage(usage_container)
+
+# ---------------------------------------------------------------------------
 # Chat history
 # ---------------------------------------------------------------------------
 for msg in st.session_state.messages:
@@ -400,7 +398,7 @@ if prompt := st.chat_input("Ask about 10-K filings…"):
                 msg_entry["table"] = df
             st.session_state.messages.append(msg_entry)
 
-            _render_usage(_usage_placeholder)
+            _render_usage(usage_container)
         else:
             fallback = "Sorry, I couldn't get a response. Please check the backend connection."
             st.warning(fallback)
