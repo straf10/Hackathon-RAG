@@ -24,6 +24,43 @@ def _escape_dollars(text: str) -> str:
 # ---------------------------------------------------------------------------
 st.set_page_config(page_title="PageIndex RAG — 10-K Analysis", page_icon="📊", layout="wide")
 
+st.markdown(
+    """
+    <style>
+    .lexio-main-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding-top: 3rem;
+    }
+    .lexio-hero {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+    .lexio-hero-title {
+        font-size: 3rem;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+    }
+    .lexio-hero-subtitle {
+        font-size: 1.1rem;
+        color: rgba(250, 250, 250, 0.8);
+        margin-top: 0.5rem;
+    }
+    .stChatMessage {
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .stChatInput {
+        max-width: 900px;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ---------------------------------------------------------------------------
 # Session state bootstrap
 # ---------------------------------------------------------------------------
@@ -35,6 +72,8 @@ if "_ingest_settled" not in st.session_state:
     st.session_state._ingest_settled = False
 if "usage_baseline_cost" not in st.session_state:
     st.session_state.usage_baseline_cost = 0.0
+if "show_hero" not in st.session_state:
+    st.session_state.show_hero = True
 
 
 def _render_usage(container) -> None:
@@ -67,6 +106,16 @@ def _render_usage(container) -> None:
         except Exception:
             st.caption("Usage data unavailable")
 
+
+# ---------------------------------------------------------------------------
+# Sidebar — minimal, with usage metrics
+# ---------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown("**Lexio**")
+    st.caption("10-K Financial Knowledge Base")
+    st.divider()
+    _usage_placeholder = st.empty()
+    _render_usage(_usage_placeholder)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -199,9 +248,12 @@ def _render_sources(sources: list[dict]) -> None:
                     else "N/A"
                 )
                 st.markdown(
-                    f"**{src['filename']}** · p.{src['page']} · relevance {score_pct}"
+                    f"**{src['filename']}** · p.{src['page']} · Similarity score {score_pct}"
                 )
-                st.caption(_escape_dollars(src.get("text_snippet", "")))
+                st.caption(
+                    _escape_dollars(src.get("text_snippet", ""))
+                    + "\n\n_Higher means semantically closer, not guaranteed factual accuracy._"
+                )
 
 
 def _try_extract_table(text: str) -> pd.DataFrame | None:
@@ -245,12 +297,11 @@ def _ingestion_status_banner():
 _ingestion_status_banner()
 
 # ---------------------------------------------------------------------------
-# Main header, settings gear, and usage metrics
+# Main header and settings gear
 # ---------------------------------------------------------------------------
 col_title, col_gear = st.columns([12, 1])
 with col_title:
-    st.header("PageIndex RAG — 10-K Analysis")
-    st.caption("10-K Financial Knowledge Base")
+    st.write("")  # spacer
 
 with col_gear:
     with st.popover("⚙ Settings", use_container_width=True):
@@ -337,32 +388,44 @@ with col_gear:
             )
             st.stop()
 
-usage_container = st.container()
-_render_usage(usage_container)
-
 # ---------------------------------------------------------------------------
-# Chat history
+# Centered main chat region with optional Lexio hero
 # ---------------------------------------------------------------------------
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(_escape_dollars(msg["content"]))
+main_container = st.container()
+with main_container:
+    if st.session_state.show_hero and not st.session_state.messages:
+        st.markdown(
+            """
+            <div class="lexio-main-container">
+              <div class="lexio-hero">
+                <div class="lexio-hero-title">LEXIO</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        if msg["role"] == "assistant":
-            sources = msg.get("sources", [])
-            if sources:
-                _render_sources(sources)
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(_escape_dollars(msg["content"]))
 
-            df = msg.get("table")
-            if df is not None:
-                st.table(df)
-                st.bar_chart(df.set_index("Label"))
+            if msg["role"] == "assistant":
+                sources = msg.get("sources", [])
+                if sources:
+                    _render_sources(sources)
 
-            _render_feedback_buttons(msg.get("query_id", ""))
+                df = msg.get("table")
+                if df is not None:
+                    st.table(df)
+                    st.bar_chart(df.set_index("Label"))
+
+                _render_feedback_buttons(msg.get("query_id", ""))
 
 # ---------------------------------------------------------------------------
 # Chat input
 # ---------------------------------------------------------------------------
-if prompt := st.chat_input("Ask about 10-K filings…"):
+if prompt := st.chat_input("Ask Lexio …"):
+    st.session_state.show_hero = False
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -398,7 +461,7 @@ if prompt := st.chat_input("Ask about 10-K filings…"):
                 msg_entry["table"] = df
             st.session_state.messages.append(msg_entry)
 
-            _render_usage(usage_container)
+            _render_usage(_usage_placeholder)
         else:
             fallback = "Sorry, I couldn't get a response. Please check the backend connection."
             st.warning(fallback)
