@@ -31,6 +31,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "backend_ok" not in st.session_state:
     st.session_state.backend_ok = None
+if "_ingest_settled" not in st.session_state:
+    st.session_state._ingest_settled = False
 
 # ---------------------------------------------------------------------------
 # Sidebar — filters & settings
@@ -316,6 +318,29 @@ def _try_extract_table(text: str) -> pd.DataFrame | None:
     if len(rows) < 2:
         return None
     return pd.DataFrame(rows)
+
+# ---------------------------------------------------------------------------
+# Auto-ingest status banner (polls backend until ingestion settles)
+# ---------------------------------------------------------------------------
+@st.fragment(run_every=3)
+def _ingestion_status_banner():
+    if st.session_state._ingest_settled:
+        return
+    try:
+        r = requests.get(f"{BACKEND_URL}/ingest/status", timeout=3)
+        if r.status_code == 200:
+            state = r.json().get("state", "idle")
+            if state == "running":
+                st.info(
+                    "Index warming up \u2014 documents are being ingested "
+                    "in the background. You can still use the app."
+                )
+            else:
+                st.session_state._ingest_settled = True
+    except Exception:
+        pass
+
+_ingestion_status_banner()
 
 # ---------------------------------------------------------------------------
 # Chat history

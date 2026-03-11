@@ -11,6 +11,34 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_auto_ingest_status: dict[str, object] = {"state": "idle"}
+
+
+async def auto_ingest_on_startup() -> None:
+    """Run ingestion(force=False) in a background thread on server boot.
+
+    Updates ``_auto_ingest_status`` so the frontend can poll via
+    ``GET /ingest/status``.
+    """
+    _auto_ingest_status["state"] = "running"
+    try:
+        result = await asyncio.to_thread(run_ingestion, False)
+        _auto_ingest_status["state"] = (
+            "skipped" if result.get("status") == "skipped" else "done"
+        )
+        _auto_ingest_status["detail"] = result
+        logger.info("Auto-ingest finished: %s", _auto_ingest_status["state"])
+    except Exception:
+        logger.exception("Auto-ingest failed")
+        _auto_ingest_status["state"] = "error"
+    finally:
+        persist_usage()
+
+
+@router.get("/ingest/status")
+async def ingest_status():
+    return _auto_ingest_status
+
 
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest(request: IngestRequest | None = None):

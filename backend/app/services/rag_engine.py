@@ -8,6 +8,7 @@ module remains importable and runnable without credentials.
 
 import logging
 
+import chromadb.errors
 from llama_index.core import VectorStoreIndex
 from llama_index.core.query_engine import SubQuestionQueryEngine
 from llama_index.core.question_gen import LLMQuestionGenerator
@@ -44,6 +45,8 @@ class RAGEngine:
         self.llm = get_llm()
         self.embed_model = get_embed_model()
         self.collection_name = collection_name
+        self._chroma_host = chroma_host
+        self._chroma_port = chroma_port
         self._index = self._connect(chroma_host, chroma_port)
         logger.info("RAGEngine initialised (collection=%s)", collection_name)
 
@@ -58,6 +61,12 @@ class RAGEngine:
             vector_store,
             embed_model=self.embed_model,
         )
+
+    def _reconnect(self) -> None:
+        """Re-establish the ChromaDB connection (e.g. after force re-ingest
+        deleted and recreated the collection)."""
+        logger.info("Reconnecting to ChromaDB (collection may have been recreated)")
+        self._index = self._connect(self._chroma_host, self._chroma_port)
 
     # -- metadata filtering -------------------------------------------------
 
@@ -189,6 +198,25 @@ class RAGEngine:
 
         metadata_filters = self._build_filters(companies, years)
 
+        try:
+            return self._execute_query(
+                question, metadata_filters, use_sub_questions, similarity_top_k,
+            )
+        except chromadb.errors.NotFoundError:
+            self._reconnect()
+            return self._execute_query(
+                question, metadata_filters, use_sub_questions, similarity_top_k,
+            )
+
+    def _execute_query(
+        self,
+        question: str,
+        metadata_filters: MetadataFilters | None,
+        use_sub_questions: bool,
+        similarity_top_k: int,
+    ) -> dict:
+        """Run the query against the current index, with optional
+        sub-question decomposition and fallback to standard engine."""
         if use_sub_questions:
             try:
                 engine = self._get_sub_question_engine(
@@ -197,6 +225,8 @@ class RAGEngine:
                 )
                 response = engine.query(question)
                 return self._format_response(response)
+            except chromadb.errors.NotFoundError:
+                raise
             except Exception:
                 logger.warning(
                     "SubQuestionQueryEngine failed (MockLLM cannot produce "

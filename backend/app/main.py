@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ from .utils.token_tracker import persist as persist_usage
 async def lifespan(app: FastAPI):
     install_token_tracking()
     query.init_engine()
+    asyncio.create_task(ingest.auto_ingest_on_startup())
     yield
     persist_usage()
 
