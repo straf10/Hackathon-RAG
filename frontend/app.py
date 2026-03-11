@@ -206,11 +206,48 @@ def _send_feedback(query_id: str, rating: str) -> None:
         pass
 
 
+_SEPARATOR_RE = re.compile(r"^\|?[\s\-:]+\|[\s\-:|]*$")
+
 _NUM_ROW_RE = re.compile(
-    r"^\|?\s*([A-Za-z][\w\s/&.-]*?)\s*\|"
-    r"\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:billion|million|B|M|bn|mn)?\s*\|",
-    re.MULTILINE,
+    r"^\|?\s*"
+    r"([\w][\w\s/&.,-]*?)"            # label: may start with digit or letter
+    r"\s*\|\s*"
+    r"\$?\s*(\(?)?\s*\$?\s*"           # optional $, optional opening paren
+    r"([\d,]+(?:\.\d+)?)"              # number
+    r"\s*(\)?)"                         # optional closing paren
+    r"\s*(%?)?"                         # optional percent
+    r"\s*(billion|million|B|M|bn|mn)?" # optional scale suffix
+    r"\s*\|?\s*$",                      # trailing pipe optional
+    re.MULTILINE | re.IGNORECASE,
 )
+
+_SCALE = {
+    "billion": 1e9, "b": 1e9, "bn": 1e9,
+    "million": 1e6, "m": 1e6, "mn": 1e6,
+}
+
+
+def _parse_row(match: re.Match) -> tuple[str, float] | None:
+    """Convert a regex match into (label, numeric_value), applying sign,
+    scale, and percentage rules.  Returns None on parse failure."""
+    label = match.group(1).strip()
+    open_paren = match.group(2)
+    raw_num = match.group(3)
+    close_paren = match.group(4)
+    pct = match.group(5)
+    suffix = (match.group(6) or "").lower()
+
+    try:
+        value = float(raw_num.replace(",", ""))
+    except ValueError:
+        return None
+
+    if open_paren == "(" and close_paren == ")":
+        value = -value
+
+    value *= _SCALE.get(suffix, 1)
+
+    return label, value
 
 
 def _render_sources(sources: list[dict]) -> None:
@@ -246,16 +283,17 @@ def _render_sources(sources: list[dict]) -> None:
 
 def _try_extract_table(text: str) -> pd.DataFrame | None:
     """Best-effort extraction of a simple label|value markdown table."""
-    matches = _NUM_ROW_RE.findall(text)
-    if len(matches) < 2:
-        return None
-    rows = []
-    for label, raw_value in matches:
-        try:
-            value = float(raw_value.replace(",", ""))
-            rows.append({"Label": label.strip(), "Value": value})
-        except ValueError:
+    rows: list[dict[str, object]] = []
+    for line in text.splitlines():
+        if _SEPARATOR_RE.match(line):
             continue
+        m = _NUM_ROW_RE.match(line)
+        if not m:
+            continue
+        parsed = _parse_row(m)
+        if parsed is None:
+            continue
+        rows.append({"Label": parsed[0], "Value": parsed[1]})
     if len(rows) < 2:
         return None
     return pd.DataFrame(rows)
