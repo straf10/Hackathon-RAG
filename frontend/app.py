@@ -1,3 +1,9 @@
+"""Lexio — 10-K Financial Knowledge Base frontend.
+
+Single-page Streamlit app with custom sidebar navigation.
+Pages: Chat (App), Analytics, Load Documents.
+"""
+
 import re
 import uuid
 
@@ -6,6 +12,10 @@ import requests
 import streamlit as st
 
 from config import BACKEND_URL
+
+# ---------------------------------------------------------------------------
+# Constants & compiled patterns
+# ---------------------------------------------------------------------------
 COMPANIES = ["NVIDIA", "Google", "Apple"]
 YEARS = [2024, 2025]
 
@@ -14,182 +24,18 @@ _SUB_Q_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-
-def _escape_dollars(text: str) -> str:
-    """Escape bare ``$`` so Streamlit doesn't render them as LaTeX."""
-    return text.replace("$", "\\$")
-
-# ---------------------------------------------------------------------------
-# Page config
-# ---------------------------------------------------------------------------
-st.set_page_config(page_title="PageIndex RAG — 10-K Analysis", page_icon="📊", layout="wide")
-
-st.markdown(
-    """
-    <style>
-    .lexio-main-container {
-        max-width: 900px;
-        margin: 0 auto;
-        padding-top: 3rem;
-    }
-    .lexio-hero {
-        text-align: center;
-        margin-bottom: 3rem;
-    }
-    .lexio-hero-title {
-        font-size: 3rem;
-        font-weight: 700;
-        letter-spacing: 0.15em;
-    }
-    .lexio-hero-subtitle {
-        font-size: 1.1rem;
-        color: rgba(250, 250, 250, 0.8);
-        margin-top: 0.5rem;
-    }
-    .stChatMessage {
-        max-width: 900px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    .stChatInput {
-        max-width: 900px;
-        margin-left: auto !important;
-        margin-right: auto !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ---------------------------------------------------------------------------
-# Session state bootstrap
-# ---------------------------------------------------------------------------
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "backend_ok" not in st.session_state:
-    st.session_state.backend_ok = None
-if "_ingest_settled" not in st.session_state:
-    st.session_state._ingest_settled = False
-if "usage_baseline_cost" not in st.session_state:
-    st.session_state.usage_baseline_cost = 0.0
-if "show_hero" not in st.session_state:
-    st.session_state.show_hero = True
-
-
-def _render_usage(container) -> None:
-    """Fetch /usage and render metrics inside the given container."""
-    with container.container():
-        st.subheader("API Usage")
-        try:
-            resp = requests.get(f"{BACKEND_URL}/usage", timeout=5)
-            if resp.status_code == 200:
-                u = resp.json()
-                cost = u.get("estimated_cost_usd", 0)
-                budget = u.get("budget_total_usd", 10)
-                baseline = st.session_state.get("usage_baseline_cost", 0.0)
-                adj_cost = max(cost - baseline, 0.0)
-                adj_remaining = max(budget - adj_cost, 0.0)
-
-                col_a, col_b = st.columns(2)
-                col_a.metric("Spent (since reset)", f"${adj_cost:.4f}")
-                col_b.metric("Remaining", f"${adj_remaining:.2f}")
-                st.progress(min(adj_cost / budget, 1.0) if budget else 0)
-
-                with st.expander("Token details"):
-                    st.markdown(
-                        f"- **LLM prompt:** {u.get('llm_prompt_tokens', 0):,}\n"
-                        f"- **LLM completion:** {u.get('llm_completion_tokens', 0):,}\n"
-                        f"- **Embedding:** {u.get('embedding_tokens', 0):,}"
-                    )
-            else:
-                st.caption("Usage data unavailable")
-        except Exception:
-            st.caption("Usage data unavailable")
-
-
-# ---------------------------------------------------------------------------
-# Sidebar — minimal, with usage metrics
-# ---------------------------------------------------------------------------
-with st.sidebar:
-    st.markdown("**Lexio**")
-    st.caption("10-K Financial Knowledge Base")
-    st.divider()
-    _usage_placeholder = st.empty()
-    _render_usage(_usage_placeholder)
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _query_backend(question: str) -> dict | None:
-    """POST to /query and return the JSON response, or None on failure."""
-    payload: dict = {"question": question, "use_sub_questions": True}
-
-    try:
-        resp = requests.post(f"{BACKEND_URL}/query", json=payload, timeout=120)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.ConnectionError:
-        st.error("Cannot reach the backend. Is it running?")
-    except requests.HTTPError as exc:
-        code = exc.response.status_code
-        if code == 429:
-            st.error(
-                "The API token budget has been exhausted — no further queries "
-                "can be processed. Please increase the budget or reset usage "
-                "counters and restart the system."
-            )
-        else:
-            st.error(f"Backend error: {code} — {exc.response.text[:300]}")
-    except requests.Timeout:
-        st.error("Request timed out. The query may be too complex — try simplifying or rephrasing the question.")
-    return None
-
-
-def _send_feedback(query_id: str, rating: str) -> None:
-    """POST to /feedback. Failures are silently logged."""
-    try:
-        requests.post(
-            f"{BACKEND_URL}/feedback",
-            json={"query_id": query_id, "rating": rating},
-            timeout=10,
-        )
-    except Exception:
-        pass
-
-
-def _render_feedback_buttons(query_id: str) -> None:
-    """Render thumbs-up / thumbs-down feedback buttons for a response."""
-    fb_key = f"fb_{query_id}"
-    if fb_key not in st.session_state:
-        st.session_state[fb_key] = None
-
-    col1, col2, _ = st.columns([1, 1, 10])
-    with col1:
-        if st.button("\U0001f44d", key=f"up_{query_id}"):
-            _send_feedback(query_id, "up")
-            st.session_state[fb_key] = "up"
-    with col2:
-        if st.button("\U0001f44e", key=f"down_{query_id}"):
-            _send_feedback(query_id, "down")
-            st.session_state[fb_key] = "down"
-
-    if st.session_state.get(fb_key):
-        st.caption(f"Feedback recorded: {st.session_state[fb_key]}")
-
-
 _SEPARATOR_RE = re.compile(r"^\|?[\s\-:]+\|[\s\-:|]*$")
 
 _NUM_ROW_RE = re.compile(
     r"^\|?\s*"
-    r"([\w][\w\s/&.,-]*?)"            # label: may start with digit or letter
+    r"([\w][\w\s/&.,-]*?)"
     r"\s*\|\s*"
-    r"\$?\s*(\(?)?\s*\$?\s*"           # optional $, optional opening paren
-    r"([\d,]+(?:\.\d+)?)"              # number
-    r"\s*(\)?)"                         # optional closing paren
-    r"\s*(%?)?"                         # optional percent
-    r"\s*(billion|million|B|M|bn|mn)?" # optional scale suffix
-    r"\s*\|?\s*$",                      # trailing pipe optional
+    r"\$?\s*(\(?)?\s*\$?\s*"
+    r"([\d,]+(?:\.\d+)?)"
+    r"\s*(\)?)"
+    r"\s*(%?)?"
+    r"\s*(billion|million|B|M|bn|mn)?"
+    r"\s*\|?\s*$",
     re.MULTILINE | re.IGNORECASE,
 )
 
@@ -199,14 +45,111 @@ _SCALE = {
 }
 
 
+def _escape_dollars(text: str) -> str:
+    """Escape bare ``$`` so Streamlit doesn't render them as LaTeX."""
+    return text.replace("$", "\\$")
+
+
+# ---------------------------------------------------------------------------
+# Page configuration
+# ---------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Lexio — 10-K Analysis",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ---------------------------------------------------------------------------
+# Global CSS
+# ---------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    /* ── Hide default Streamlit multi-page navigation ── */
+    [data-testid="stSidebarNav"] { display: none !important; }
+
+    /* ── Sidebar logo ── */
+    .sidebar-logo {
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: #ffffff;
+        padding: 0.25rem 0;
+    }
+
+    /* ── Hero section (chat landing) ── */
+    .hero-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 38vh;
+        padding-top: 8vh;
+    }
+    .hero-heading {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 0.5rem;
+    }
+
+    /* ── Chat input: centered, 50-60 % width, max 720 px ── */
+    [data-testid="stChatInput"] {
+        max-width: 720px !important;
+        width: 60% !important;
+        min-width: 340px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    [data-testid="stChatInput"] > div {
+        border-radius: 24px !important;
+        border: 1px solid rgba(250, 250, 250, 0.12) !important;
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.08) !important;
+    }
+
+    /* ── Chat messages ── */
+    [data-testid="stChatMessage"] {
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* ── Sidebar buttons: left-align text ── */
+    [data-testid="stSidebar"] [data-testid="stButton"] button {
+        text-align: left !important;
+        justify-content: flex-start !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ---------------------------------------------------------------------------
+# Session state bootstrap
+# ---------------------------------------------------------------------------
+_DEFAULTS: dict = {
+    "page": "app",
+    "messages": [],
+    "backend_ok": None,
+    "_ingest_settled": False,
+    "usage_baseline_cost": 0.0,
+    "show_hero": True,
+}
+for _k, _v in _DEFAULTS.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
+
+
+# ---------------------------------------------------------------------------
+# Helpers — table extraction
+# ---------------------------------------------------------------------------
 def _parse_row(match: re.Match) -> tuple[str, float] | None:
-    """Convert a regex match into (label, numeric_value), applying sign,
-    scale, and percentage rules.  Returns None on parse failure."""
     label = match.group(1).strip()
     open_paren = match.group(2)
     raw_num = match.group(3)
     close_paren = match.group(4)
-    pct = match.group(5)
+    _pct = match.group(5)
     suffix = (match.group(6) or "").lower()
 
     try:
@@ -218,46 +161,10 @@ def _parse_row(match: re.Match) -> tuple[str, float] | None:
         value = -value
 
     value *= _SCALE.get(suffix, 1)
-
     return label, value
 
 
-def _render_sources(sources: list[dict]) -> None:
-    """Render source citations, separating sub-question reasoning steps
-    from actual document sources."""
-    sub_qs = [s for s in sources if s.get("source_type") == "sub_question"]
-    docs = [s for s in sources if s.get("source_type") != "sub_question"]
-
-    if sub_qs:
-        with st.expander(f"Reasoning steps ({len(sub_qs)})"):
-            for i, sq in enumerate(sub_qs, 1):
-                m = _SUB_Q_RE.match(sq.get("text_snippet", ""))
-                if m:
-                    st.markdown(f"**Step {i}:** {_escape_dollars(m['question'])}")
-                    st.caption(_escape_dollars(m["response"]))
-                else:
-                    st.markdown(f"**Step {i}**")
-                    st.caption(_escape_dollars(sq.get("text_snippet", "")))
-
-    if docs:
-        with st.expander(f"Sources ({len(docs)})"):
-            for src in docs:
-                score_pct = (
-                    f"{src['score'] * 100:.1f}%"
-                    if src.get("score") is not None
-                    else "N/A"
-                )
-                st.markdown(
-                    f"**{src['filename']}** · p.{src['page']} · Similarity score {score_pct}"
-                )
-                st.caption(
-                    _escape_dollars(src.get("text_snippet", ""))
-                    + "\n\n_Higher means semantically closer, not guaranteed factual accuracy._"
-                )
-
-
 def _try_extract_table(text: str) -> pd.DataFrame | None:
-    """Best-effort extraction of a simple label|value markdown table."""
     rows: list[dict[str, object]] = []
     for line in text.splitlines():
         if _SEPARATOR_RE.match(line):
@@ -273,8 +180,116 @@ def _try_extract_table(text: str) -> pd.DataFrame | None:
         return None
     return pd.DataFrame(rows)
 
+
 # ---------------------------------------------------------------------------
-# Auto-ingest status banner (polls backend until ingestion settles)
+# Helpers — rendering
+# ---------------------------------------------------------------------------
+def _render_sources(sources: list[dict]) -> None:
+    sub_qs = [s for s in sources if s.get("source_type") == "sub_question"]
+    docs = [s for s in sources if s.get("source_type") != "sub_question"]
+
+    if sub_qs:
+        with st.expander(f"Reasoning steps ({len(sub_qs)})"):
+            for i, sq in enumerate(sub_qs, 1):
+                m = _SUB_Q_RE.match(sq.get("text_snippet", ""))
+                if m:
+                    st.markdown(
+                        f"**Step {i}:** {_escape_dollars(m['question'])}"
+                    )
+                    st.caption(_escape_dollars(m["response"]))
+                else:
+                    st.markdown(f"**Step {i}**")
+                    st.caption(_escape_dollars(sq.get("text_snippet", "")))
+
+    if docs:
+        with st.expander(f"Sources ({len(docs)})"):
+            for src in docs:
+                score_pct = (
+                    f"{src['score'] * 100:.1f}%"
+                    if src.get("score") is not None
+                    else "N/A"
+                )
+                st.markdown(
+                    f"**{src['filename']}** · p.{src['page']} · "
+                    f"Similarity score {score_pct}"
+                )
+                st.caption(
+                    _escape_dollars(src.get("text_snippet", ""))
+                    + "\n\n_Higher means semantically closer, "
+                    "not guaranteed factual accuracy._"
+                )
+
+
+# ---------------------------------------------------------------------------
+# Helpers — backend communication
+# ---------------------------------------------------------------------------
+def _query_backend(question: str) -> dict | None:
+    payload: dict = {"question": question, "use_sub_questions": True}
+    try:
+        resp = requests.post(
+            f"{BACKEND_URL}/query", json=payload, timeout=120
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.ConnectionError:
+        st.error("Cannot reach the backend. Is it running?")
+    except requests.HTTPError as exc:
+        code = exc.response.status_code
+        if code == 429:
+            st.error(
+                "The API token budget has been exhausted — no further queries "
+                "can be processed. Please increase the budget or reset usage "
+                "counters and restart the system."
+            )
+        else:
+            st.error(f"Backend error: {code} — {exc.response.text[:300]}")
+    except requests.Timeout:
+        st.error(
+            "Request timed out. The query may be too complex — "
+            "try simplifying or rephrasing the question."
+        )
+    return None
+
+
+def _fetch_usage() -> dict | None:
+    try:
+        resp = requests.get(f"{BACKEND_URL}/usage", timeout=5)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Help dialog — "About this RAG"
+# ---------------------------------------------------------------------------
+@st.dialog("About this RAG", width="large")
+def _help_dialog():
+    st.markdown(
+        "Financial analysts spend hours manually searching long SEC 10\u2011K "
+        "filings to extract revenue figures, risk factors, segment breakdowns, "
+        "and year\u2011over\u2011year comparisons. The information is buried in "
+        "hundreds of pages of legal and financial text."
+    )
+    st.markdown(
+        "Lexio is a Retrieval\u2011Augmented Generation (RAG) system that "
+        "ingests 10\u2011K annual reports from major public companies, indexes "
+        "them at page level, and answers natural\u2011language financial "
+        "questions with grounded, source\u2011cited, explainable responses."
+    )
+    st.markdown(
+        "- Semantic search with company/year filters.\n"
+        "- Answers always include citations with page references.\n"
+        "- Supports multi\u2011step comparative questions "
+        "(e.g., revenue comparisons)."
+    )
+    if st.button("Got it", type="primary", use_container_width=True):
+        st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# Ingestion status banner (auto-polling fragment)
 # ---------------------------------------------------------------------------
 @st.fragment(run_every=3)
 def _ingestion_status_banner():
@@ -286,7 +301,7 @@ def _ingestion_status_banner():
             state = r.json().get("state", "idle")
             if state == "running":
                 st.info(
-                    "Index warming up \u2014 documents are being ingested "
+                    "Index warming up \u2014 documents are being loaded "
                     "in the background. You can still use the app."
                 )
             else:
@@ -294,20 +309,52 @@ def _ingestion_status_banner():
     except Exception:
         pass
 
-_ingestion_status_banner()
 
 # ---------------------------------------------------------------------------
-# Main header and settings gear
+# Sidebar
 # ---------------------------------------------------------------------------
-col_title, col_gear = st.columns([12, 1])
-with col_title:
-    st.write("")  # spacer
+with st.sidebar:
+    st.markdown(
+        '<div class="sidebar-logo">LEXIO</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("10-K Financial Knowledge Base")
+    st.divider()
 
-with col_gear:
-    with st.popover("⚙ Settings", use_container_width=True):
-        st.caption("Advanced controls")
+    _NAV = [
+        ("app", "App"),
+        ("analytics", "Analytics"),
+        ("load_documents", "Documents"),
+    ]
+    for _pid, _lbl in _NAV:
+        _active = st.session_state.page == _pid
+        if st.button(
+            _lbl,
+            key=f"sb_{_pid}",
+            use_container_width=True,
+            type="primary" if _active else "secondary",
+        ):
+            st.session_state.page = _pid
+            st.rerun()
 
-        if st.button("Check backend health", key="btn_check_health"):
+    # Flexible spacer — pushes help/settings toward the bottom
+    st.markdown(
+        '<div style="min-height:calc(100vh - 560px)"></div>',
+        unsafe_allow_html=True,
+    )
+    st.divider()
+
+    # Help (❓) — directly above settings gear
+    if st.button(
+        "\u2753", key="sb_help", use_container_width=True, help="About this RAG"
+    ):
+        _help_dialog()
+
+    # Settings (⚙)
+    with st.popover("\u2699", use_container_width=True, help="Settings"):
+        st.subheader("Settings")
+
+        if st.button("Check backend health", key="btn_health"):
             try:
                 r = requests.get(f"{BACKEND_URL}/health", timeout=5)
                 st.session_state.backend_ok = r.status_code == 200
@@ -320,149 +367,235 @@ with col_gear:
             st.error("Backend unreachable")
 
         st.divider()
-        force_reingest = st.checkbox(
-            "Force re-ingest",
-            value=False,
-            key="chk_force_reingest",
-            help="Rebuild the index even if documents were already ingested.",
-        )
-        if st.button("Run ingestion", key="btn_run_ingest"):
-            with st.spinner("Ingesting documents…"):
-                try:
-                    r = requests.post(
-                        f"{BACKEND_URL}/ingest",
-                        json={"force": force_reingest},
-                        timeout=600,
-                    )
-                    if r.status_code == 200:
-                        data = r.json()
-                        if data.get("status") == "skipped":
-                            st.info(
-                                f"Documents already ingested "
-                                f"({data.get('existing_chunks', 0)} chunks in database). "
-                                f"Enable **Force re-ingest** to reload."
-                            )
-                        else:
-                            st.success(
-                                f"Ingested {data.get('documents_processed', 0)} docs, "
-                                f"{data.get('chunks_created', 0)} chunks created."
-                            )
-                    else:
-                        st.error(f"Ingestion failed: {r.status_code} — {r.text[:200]}")
-                except requests.ConnectionError:
-                    st.error("Cannot reach the backend. Is it running?")
-                except requests.Timeout:
-                    st.error("Ingestion timed out.")
-                except Exception as exc:
-                    st.error(f"Ingestion failed: {exc}")
 
-        st.divider()
         if st.button("Reset usage baseline", key="btn_reset_usage"):
-            try:
-                resp = requests.get(f"{BACKEND_URL}/usage", timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    st.session_state.usage_baseline_cost = data.get("estimated_cost_usd", 0.0)
-                    st.success("Usage metrics reset. Totals are now counted from this point.")
-                else:
-                    st.error("Unable to retrieve usage data to reset.")
-            except Exception:
+            usage = _fetch_usage()
+            if usage:
+                st.session_state.usage_baseline_cost = usage.get(
+                    "estimated_cost_usd", 0.0
+                )
+                st.success("Usage metrics reset.")
+            else:
                 st.error("Failed to reset usage metrics.")
 
-        st.divider()
-        if st.button("Clear chat history", key="btn_clear_chat"):
+        if st.button("Clear chat history", key="btn_clear"):
             st.session_state.messages = []
+            st.session_state.show_hero = True
             st.rerun()
 
+        st.divider()
+
         if st.button("Shut Down System", type="primary", key="btn_shutdown"):
-            with st.spinner("Saving data and shutting down…"):
+            with st.spinner("Saving data and shutting down\u2026"):
                 try:
                     requests.post(f"{BACKEND_URL}/shutdown", timeout=10)
                 except Exception:
                     pass
             st.session_state.messages = []
             st.success(
-                "All data has been saved. "
-                "Press **Ctrl+C** in the terminal to stop the containers, "
-                "or run `docker compose down` to shut down completely."
+                "All data saved. Press Ctrl+C in the terminal to stop "
+                "containers, or run `docker compose down`."
             )
             st.stop()
 
+
 # ---------------------------------------------------------------------------
-# Centered main chat region with optional Lexio hero
+# Main content
 # ---------------------------------------------------------------------------
-main_container = st.container()
-with main_container:
+_ingestion_status_banner()
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PAGE ROUTING
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── PAGE: App (Chat) ──────────────────────────────────────────────────────
+if st.session_state.page == "app":
+
     if st.session_state.show_hero and not st.session_state.messages:
         st.markdown(
-            """
-            <div class="lexio-main-container">
-              <div class="lexio-hero">
-                <div class="lexio-hero-title">LEXIO</div>
-              </div>
-            </div>
-            """,
+            '<div class="hero-container">'
+            "<div class=\"hero-heading\">What's on your mind</div>"
+            "</div>",
             unsafe_allow_html=True,
         )
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(_escape_dollars(msg["content"]))
-
             if msg["role"] == "assistant":
                 sources = msg.get("sources", [])
                 if sources:
                     _render_sources(sources)
-
                 df = msg.get("table")
                 if df is not None:
                     st.table(df)
                     st.bar_chart(df.set_index("Label"))
 
-                _render_feedback_buttons(msg.get("query_id", ""))
+    if prompt := st.chat_input("Ask me anything"):
+        st.session_state.show_hero = False
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-# ---------------------------------------------------------------------------
-# Chat input
-# ---------------------------------------------------------------------------
-if prompt := st.chat_input("Ask Lexio …"):
-    st.session_state.show_hero = False
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking\u2026"):
+                result = _query_backend(prompt)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking…"):
-            result = _query_backend(prompt)
+            if result is not None:
+                answer = result.get("answer", "")
+                sources = result.get("sources", [])
+                query_id = result.get("query_id") or str(uuid.uuid4())
 
-        if result is not None:
-            answer = result.get("answer", "")
-            sources = result.get("sources", [])
-            query_id = result.get("query_id") or str(uuid.uuid4())
+                st.markdown(_escape_dollars(answer))
 
-            st.markdown(_escape_dollars(answer))
+                if sources:
+                    _render_sources(sources)
 
-            if sources:
-                _render_sources(sources)
+                df = _try_extract_table(answer)
+                if df is not None:
+                    st.table(df)
+                    st.bar_chart(df.set_index("Label"))
 
-            df = _try_extract_table(answer)
-            if df is not None:
-                st.table(df)
-                st.bar_chart(df.set_index("Label"))
+                msg_entry: dict = {
+                    "role": "assistant",
+                    "content": answer,
+                    "sources": sources,
+                    "query_id": query_id,
+                }
+                if df is not None:
+                    msg_entry["table"] = df
+                st.session_state.messages.append(msg_entry)
+            else:
+                fallback = (
+                    "Sorry, I couldn\u2019t get a response. "
+                    "Please check the backend connection."
+                )
+                st.warning(fallback)
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": fallback}
+                )
 
-            _render_feedback_buttons(query_id)
+# ── PAGE: Analytics ───────────────────────────────────────────────────────
+elif st.session_state.page == "analytics":
+    st.header("Analytics")
 
-            msg_entry = {
-                "role": "assistant",
-                "content": answer,
-                "sources": sources,
-                "query_id": query_id,
-            }
-            if df is not None:
-                msg_entry["table"] = df
-            st.session_state.messages.append(msg_entry)
+    usage = _fetch_usage()
 
-            _render_usage(_usage_placeholder)
-        else:
-            fallback = "Sorry, I couldn't get a response. Please check the backend connection."
-            st.warning(fallback)
-            st.session_state.messages.append({"role": "assistant", "content": fallback})
+    if usage:
+        # ── Token Usage ──
+        st.subheader("Token Usage")
+
+        cost = usage.get("estimated_cost_usd", 0)
+        budget = usage.get("budget_total_usd", 10)
+        baseline = st.session_state.get("usage_baseline_cost", 0.0)
+        adj_cost = max(cost - baseline, 0.0)
+        adj_remaining = max(budget - adj_cost, 0.0)
+
+        c1, c2 = st.columns(2)
+        c1.metric("Spent (since reset)", f"${adj_cost:.4f}")
+        c2.metric("Remaining", f"${adj_remaining:.2f}")
+        st.progress(min(adj_cost / budget, 1.0) if budget else 0)
+
+        with st.expander("Token details"):
+            st.markdown(
+                f"- **LLM prompt:** {usage.get('llm_prompt_tokens', 0):,}\n"
+                f"- **LLM completion:** {usage.get('llm_completion_tokens', 0):,}\n"
+                f"- **Embedding:** {usage.get('embedding_tokens', 0):,}"
+            )
+
+        st.divider()
+
+        # ── Token Efficiency ──
+        st.subheader("Token Efficiency")
+
+        prompt_tok = usage.get("llm_prompt_tokens", 0)
+        completion_tok = usage.get("llm_completion_tokens", 0)
+        embed_tok = usage.get("embedding_tokens", 0)
+        total_tok = prompt_tok + completion_tok + embed_tok
+
+        e1, e2, e3 = st.columns(3)
+        e1.metric("Total Tokens", f"{total_tok:,}")
+        e2.metric(
+            "Completion / Prompt",
+            (
+                f"{completion_tok / prompt_tok:.2f}"
+                if prompt_tok > 0
+                else "N/A"
+            ),
+        )
+        e3.metric(
+            "Cost per 1K Tokens",
+            (
+                f"${(cost / total_tok * 1000):.4f}"
+                if total_tok > 0
+                else "N/A"
+            ),
+        )
+
+        if total_tok > 0:
+            st.markdown("**Token Distribution**")
+            dist_df = pd.DataFrame(
+                {
+                    "Category": ["LLM Prompt", "LLM Completion", "Embedding"],
+                    "Tokens": [prompt_tok, completion_tok, embed_tok],
+                }
+            )
+            st.bar_chart(dist_df.set_index("Category"))
+    else:
+        st.warning("Usage data unavailable. Is the backend running?")
+
+# ── PAGE: Load Documents ──────────────────────────────────────────────────
+elif st.session_state.page == "load_documents":
+    st.header("Load Documents")
+    st.caption("Ingest 10-K annual reports into the knowledge base")
+
+    force = st.checkbox(
+        "Force re-ingest",
+        value=False,
+        key="ld_force",
+        help="Rebuild the index even if documents were already loaded.",
+    )
+
+    if st.button("Load Documents", type="primary", key="btn_load"):
+        with st.spinner("Loading documents\u2026"):
+            try:
+                r = requests.post(
+                    f"{BACKEND_URL}/ingest",
+                    json={"force": force},
+                    timeout=600,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get("status") == "skipped":
+                        st.info(
+                            f"Documents already loaded "
+                            f"({data.get('existing_chunks', 0)} chunks). "
+                            f"Enable **Force re-ingest** to reload."
+                        )
+                    else:
+                        st.success(
+                            f"Loaded {data.get('documents_processed', 0)} "
+                            f"documents \u2014 "
+                            f"{data.get('chunks_created', 0)} chunks created."
+                        )
+                else:
+                    st.error(
+                        f"Loading failed: {r.status_code} \u2014 "
+                        f"{r.text[:200]}"
+                    )
+            except requests.ConnectionError:
+                st.error("Cannot reach the backend. Is it running?")
+            except requests.Timeout:
+                st.error("Loading timed out.")
+            except Exception as exc:
+                st.error(f"Loading failed: {exc}")
+
+    st.divider()
+    st.subheader("Available Documents")
+    st.markdown(
+        "| Company | FY 2024 | FY 2025 |\n"
+        "|---------|---------|---------|\n"
+        "| NVIDIA | `nvidia_2024.pdf` | `nvidia_2025.pdf` |\n"
+        "| Alphabet (Google) | `google-2024.pdf` | `google_2025.pdf` |\n"
+        "| Apple | `apple_2024.pdf` | `apple_2025.pdf` |"
+    )
