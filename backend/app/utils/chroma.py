@@ -24,7 +24,10 @@ def connect_chroma(
     for attempt in range(1, _CHROMA_MAX_RETRIES + 1):
         try:
             client = chromadb.HttpClient(host=host, port=port)
-            collection = client.get_or_create_collection(collection_name)
+            collection = client.get_or_create_collection(
+                collection_name,
+                metadata={"hnsw:space": "cosine"},
+            )
             logger.info(
                 "ChromaDB connected at %s:%s (attempt %d, collection=%s, count=%d)",
                 host, port, attempt, collection_name, collection.count(),

@@ -132,20 +132,40 @@ class TestIngestErrors:
 # _extract_metadata — filename parsing
 # ===========================================================================
 class TestExtractMetadata:
-    def test_nvidia_2024(self):
-        meta = _extract_metadata("data/nvidia/nvidia_2024.pdf")
+    def test_10k_detected_from_filename(self):
+        meta = _extract_metadata("data/nvidia/10k_2024.pdf")
         assert meta["company"] == "nvidia"
         assert meta["year"] == 2024
         assert meta["doc_type"] == "10-K"
-        assert meta["source_file"] == "nvidia_2024.pdf"
+        assert meta["source_file"] == "10k_2024.pdf"
+
+    def test_10q_detected_from_filename(self):
+        meta = _extract_metadata("data/nvidia/10q_2024.pdf")
+        assert meta["doc_type"] == "10-Q"
+
+    def test_10q_hyphenated(self):
+        meta = _extract_metadata("data/nvidia/10-Q_2024.pdf")
+        assert meta["doc_type"] == "10-Q"
+
+    def test_def14a_detected(self):
+        meta = _extract_metadata("data/nvidia/def14a_2024.pdf")
+        assert meta["doc_type"] == "DEF 14A"
+
+    def test_def14a_with_separator(self):
+        meta = _extract_metadata("data/nvidia/DEF_14A_2024.pdf")
+        assert meta["doc_type"] == "DEF 14A"
+
+    def test_unknown_doc_type_fallback(self):
+        meta = _extract_metadata("data/nvidia/nvidia_2024.pdf")
+        assert meta["doc_type"] == "Other"
 
     def test_google_2025(self):
-        meta = _extract_metadata("data/google/google_2025.pdf")
+        meta = _extract_metadata("data/google/10k_2025.pdf")
         assert meta["company"] == "google"
         assert meta["year"] == 2025
 
     def test_apple_2024(self):
-        meta = _extract_metadata("data/apple/apple_2024.pdf")
+        meta = _extract_metadata("data/apple/10k_2024.pdf")
         assert meta["company"] == "apple"
         assert meta["year"] == 2024
 
@@ -159,9 +179,9 @@ class TestExtractMetadata:
         assert meta["year"] == 0
 
     def test_deeply_nested_path(self):
-        meta = _extract_metadata("/a/b/c/apple/apple_2025.pdf")
+        meta = _extract_metadata("/a/b/c/apple/10k_2025.pdf")
         assert meta["company"] == "apple"
-        assert meta["source_file"] == "apple_2025.pdf"
+        assert meta["source_file"] == "10k_2025.pdf"
 
 
 # ===========================================================================

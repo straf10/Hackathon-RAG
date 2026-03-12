@@ -60,6 +60,30 @@ class TestBuildFilters:
         assert len(f.filters) == 1
         assert f.filters[0].key == "company"
 
+    def test_doc_types_only(self):
+        f = RAGEngine._build_filters(doc_types=["10-K"])
+        assert f is not None
+        assert len(f.filters) == 1
+        assert f.filters[0].key == "doc_type"
+        assert f.filters[0].operator == FilterOperator.IN
+        assert "10-K" in f.filters[0].value
+
+    def test_doc_types_uppercased(self):
+        f = RAGEngine._build_filters(doc_types=["10-k", "10-q"])
+        assert f.filters[0].value == ["10-K", "10-Q"]
+
+    def test_all_three_filters(self):
+        f = RAGEngine._build_filters(
+            companies=["nvidia"], years=[2024], doc_types=["10-K", "10-Q"]
+        )
+        assert f is not None
+        assert len(f.filters) == 3
+        assert f.condition == FilterCondition.AND
+
+    def test_empty_doc_types_ignored(self):
+        f = RAGEngine._build_filters(doc_types=[])
+        assert f is None
+
 
 # ===========================================================================
 # _format_response

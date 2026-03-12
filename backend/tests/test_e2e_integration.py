@@ -98,11 +98,11 @@ class TestRealMetadataEnrichment:
         companies_found = {d.metadata["company"] for d in enriched_docs}
         assert len(companies_found) >= 1
         for c in companies_found:
-            assert c in ("nvidia", "google", "apple")
+            assert c in ("nvidia", "google", "apple", "microsoft", "tesla")
 
     def test_year_extracted(self, enriched_docs):
         years_found = {d.metadata["year"] for d in enriched_docs}
-        assert years_found.issubset({2024, 2025})
+        assert years_found.issubset({2023, 2024, 2025})
 
     def test_doc_type_is_10k(self, enriched_docs):
         for doc in enriched_docs[:20]:
@@ -291,18 +291,27 @@ class TestCorpusMetadataExtraction:
     """Verify _extract_metadata handles every filename pattern in data/."""
 
     _CORPUS = [
-        ("data/nvidia/nvidia_2024.pdf", "nvidia", 2024),
-        ("data/nvidia/nvidia_2025.pdf", "nvidia", 2025),
-        ("data/google/google-2024.pdf", "google", 2024),
-        ("data/google/google_2025.pdf", "google", 2025),
-        ("data/apple/apple_2024.pdf", "apple", 2024),
-        ("data/apple/apple_2025.pdf", "apple", 2025),
+        ("data/nvidia/10k_2023.pdf", "nvidia", 2023, "10-K"),
+        ("data/nvidia/10k_2024.pdf", "nvidia", 2024, "10-K"),
+        ("data/nvidia/10k_2025.pdf", "nvidia", 2025, "10-K"),
+        ("data/google/10k_2023.pdf", "google", 2023, "10-K"),
+        ("data/google/10k_2024.pdf", "google", 2024, "10-K"),
+        ("data/google/10k_2025.pdf", "google", 2025, "10-K"),
+        ("data/apple/10k_2023.pdf", "apple", 2023, "10-K"),
+        ("data/apple/10k_2024.pdf", "apple", 2024, "10-K"),
+        ("data/apple/10k_2025.pdf", "apple", 2025, "10-K"),
+        ("data/microsoft/10k_2023.pdf", "microsoft", 2023, "10-K"),
+        ("data/microsoft/10k_2024.pdf", "microsoft", 2024, "10-K"),
+        ("data/microsoft/10k_2025.pdf", "microsoft", 2025, "10-K"),
+        ("data/tesla/10k_2023.pdf", "tesla", 2023, "10-K"),
+        ("data/tesla/10k_2024.pdf", "tesla", 2024, "10-K"),
+        ("data/tesla/10k_2025.pdf", "tesla", 2025, "10-K"),
     ]
 
-    @pytest.mark.parametrize("path,company,year", _CORPUS)
-    def test_extracts_correct_metadata(self, path, company, year):
+    @pytest.mark.parametrize("path,company,year,doc_type", _CORPUS)
+    def test_extracts_correct_metadata(self, path, company, year, doc_type):
         meta = _extract_metadata(path)
         assert meta["company"] == company
         assert meta["year"] == year
-        assert meta["doc_type"] == "10-K"
+        assert meta["doc_type"] == doc_type
         assert meta["source_file"].endswith(".pdf")

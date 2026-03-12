@@ -13,6 +13,7 @@ from llama_index.core import VectorStoreIndex
 from llama_index.core.query_engine import SubQuestionQueryEngine
 from llama_index.core.question_gen import LLMQuestionGenerator
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
+from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.vector_stores import (
     FilterCondition,
     FilterOperator,
@@ -74,11 +75,12 @@ class RAGEngine:
     def _build_filters(
         companies: list[str] | None = None,
         years: list[int] | None = None,
+        doc_types: list[str] | None = None,
     ) -> MetadataFilters | None:
         """Construct metadata filters.
 
-        When both ``companies`` and ``years`` are provided the resulting
-        filter is: ``company IN [...]  AND  year IN [...]``.
+        Filters are combined with AND: ``company IN [...]  AND  year IN [...]
+        AND  doc_type IN [...]``.
         """
         conditions: list[MetadataFilter] = []
 
@@ -98,6 +100,14 @@ class RAGEngine:
                     operator=FilterOperator.IN,
                 )
             )
+        if doc_types:
+            conditions.append(
+                MetadataFilter(
+                    key="doc_type",
+                    value=[dt.upper() for dt in doc_types],
+                    operator=FilterOperator.IN,
+                )
+            )
 
         if not conditions:
             return None
@@ -109,16 +119,21 @@ class RAGEngine:
 
     # -- query engines ------------------------------------------------------
 
+    _SIMILARITY_CUTOFF = 0.70
+
     def _get_query_engine(
         self,
         filters: MetadataFilters | None = None,
-        similarity_top_k: int = 5,
+        similarity_top_k: int = 10,
     ):
         """Build a standard single-step query engine with optional
-        metadata pre-filtering."""
+        metadata pre-filtering and a cosine-similarity score threshold."""
         kwargs: dict = {
             "llm": self.llm,
             "similarity_top_k": similarity_top_k,
+            "node_postprocessors": [
+                SimilarityPostprocessor(similarity_cutoff=self._SIMILARITY_CUTOFF),
+            ],
         }
         if filters is not None:
             kwargs["filters"] = filters
@@ -127,7 +142,7 @@ class RAGEngine:
     def _get_sub_question_engine(
         self,
         filters: MetadataFilters | None = None,
-        similarity_top_k: int = 5,
+        similarity_top_k: int = 10,
     ):
         """``SubQuestionQueryEngine`` decomposes a complex question into
         simpler sub-questions, runs each against the base engine, and merges
@@ -140,12 +155,12 @@ class RAGEngine:
         tool = QueryEngineTool(
             query_engine=base_engine,
             metadata=ToolMetadata(
-                name="financial_10k_filings",
+                name="sec_financial_filings",
                 description=(
-                    "10-K annual report data for NVIDIA, Google/Alphabet, "
-                    "and Apple for fiscal years 2024–2025.  Covers revenue, "
-                    "expenses, net income, risk factors, and other financial "
-                    "metrics."
+                    "SEC financial filings (10-K, 10-Q, DEF 14A, and other "
+                    "forms) for publicly traded companies.  Covers revenue, "
+                    "expenses, net income, risk factors, segment data, and "
+                    "other financial metrics across multiple fiscal years."
                 ),
             ),
         )
@@ -163,10 +178,11 @@ class RAGEngine:
         question: str,
         companies: list[str] | None = None,
         years: list[int] | None = None,
+        doc_types: list[str] | None = None,
         use_sub_questions: bool = True,
-        similarity_top_k: int = 5,
+        similarity_top_k: int = 10,
     ) -> dict:
-        """Run a RAG query against the financial 10-K vector store.
+        """Run a RAG query against the financial vector store.
 
         Parameters
         ----------
@@ -176,6 +192,8 @@ class RAGEngine:
             Optional filter — e.g. ``["nvidia", "apple"]``.
         years:
             Optional filter — e.g. ``[2024, 2025]``.
+        doc_types:
+            Optional filter — e.g. ``["10-K", "10-Q"]``.
         use_sub_questions:
             Use ``SubQuestionQueryEngine`` for multi-step reasoning.
         similarity_top_k:
@@ -188,15 +206,16 @@ class RAGEngine:
             "score", "text_snippet"}, ...]}``
         """
         logger.info(
-            "Query: %r | companies=%s years=%s sub_q=%s top_k=%d",
+            "Query: %r | companies=%s years=%s doc_types=%s sub_q=%s top_k=%d",
             question,
             companies,
             years,
+            doc_types,
             use_sub_questions,
             similarity_top_k,
         )
 
-        metadata_filters = self._build_filters(companies, years)
+        metadata_filters = self._build_filters(companies, years, doc_types)
 
         try:
             return self._execute_query(

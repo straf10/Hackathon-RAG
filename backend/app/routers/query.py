@@ -96,6 +96,7 @@ async def query(request: QueryRequest):
             question=request.question,
             companies=request.companies,
             years=request.years,
+            doc_types=request.doc_types,
             use_sub_questions=request.use_sub_questions,
         )
     except Exception as exc:

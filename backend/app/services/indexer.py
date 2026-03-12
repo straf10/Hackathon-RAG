@@ -40,6 +40,24 @@ def _save_fingerprint(fingerprint: str) -> None:
     _FINGERPRINT_FILE.write_text(json.dumps({"fingerprint": fingerprint}))
 
 
+_DOC_TYPE_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"10[\-_]?k", re.IGNORECASE), "10-K"),
+    (re.compile(r"10[\-_]?q", re.IGNORECASE), "10-Q"),
+    (re.compile(r"def[\-_\s]?14[\-_\s]?a", re.IGNORECASE), "DEF 14A"),
+]
+
+
+def _detect_doc_type(file_path: str) -> str:
+    """Infer SEC filing type from the file path via regex.
+
+    Falls back to ``"Other"`` when no known pattern matches.
+    """
+    for pattern, label in _DOC_TYPE_PATTERNS:
+        if pattern.search(file_path):
+            return label
+    return "Other"
+
+
 def _extract_metadata(file_path: str) -> dict:
     p = Path(file_path)
     company = p.parent.name
@@ -47,7 +65,7 @@ def _extract_metadata(file_path: str) -> dict:
     return {
         "company": company,
         "year": int(year_match.group(1)) if year_match else 0,
-        "doc_type": "10-K",
+        "doc_type": _detect_doc_type(file_path),
         "source_file": p.name,
     }
 
@@ -107,7 +125,10 @@ def _run_ingestion_locked(force: bool) -> dict:
     if existing_count > 0 and force:
         logger.info("Force re-ingest: deleting existing collection '%s'", COLLECTION_NAME)
         client.delete_collection(COLLECTION_NAME)
-        chroma_collection = client.get_or_create_collection(COLLECTION_NAME)
+        chroma_collection = client.get_or_create_collection(
+            COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
+        )
 
     logger.info("Loading PDF documents from %s", settings.DATA_DIR)
     documents = load_pdf_documents(settings.DATA_DIR)
@@ -115,7 +136,7 @@ def _run_ingestion_locked(force: bool) -> dict:
     documents = enrich_metadata(documents)
     logger.info("Metadata enriched for %d documents", len(documents))
 
-    splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200)
+    splitter = SentenceSplitter(chunk_size=1536, chunk_overlap=256)
     nodes = splitter.get_nodes_from_documents(documents)
     logger.info("Created %d chunks from %d documents", len(nodes), len(documents))
 
