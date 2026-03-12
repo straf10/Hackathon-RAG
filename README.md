@@ -101,6 +101,26 @@ docker compose up --build
 
 The first build downloads base images and installs dependencies (3–5 minutes). Subsequent starts are faster.
 
+### 3a. Clean rebuild and faster subsequent builds (Windows PowerShell)
+
+Use this when you want to clear the project images and measure build performance on Windows:
+
+```powershell
+cd C:\Python\Hackathon-RAG
+$env:DOCKER_BUILDKIT = "1"
+$env:COMPOSE_DOCKER_CLI_BUILD = "1"
+
+# 1) One true cold build (no cache)
+docker compose build --no-cache   # measure this once
+
+# 2) Cached builds (typical workflow)
+docker compose build              # measure
+docker compose build              # measure again
+```
+
+- **First clean run**: use the `--no-cache` command once to get a baseline for a full cold build.
+- **Following runs**: use the regular `docker compose build` commands (with cache) for much faster rebuilds during development.
+
 ### 4. Verify all services
 
 | Service | URL | Expected |
