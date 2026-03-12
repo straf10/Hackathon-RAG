@@ -4,7 +4,7 @@
 
 Financial analysts spend hours manually searching through SEC 10-K filings — documents that routinely exceed 200 pages — to extract revenue figures, risk factors, segment breakdowns, and year-over-year comparisons. The information is buried across disparate sections, inconsistent formatting, and legal boilerplate.
 
-**PageIndex RAG** is a Retrieval-Augmented Generation (RAG) system that solves this problem. It ingests 10-K annual reports from major public companies (NVIDIA, Alphabet/Google, Apple), indexes them at page-level granularity, and answers natural-language financial questions with **grounded, source-cited, explainable responses**.
+**PageIndex RAG** is a Retrieval-Augmented Generation (RAG) system that solves this problem. It ingests 10-K annual reports from major public companies (NVIDIA, Alphabet/Google, Apple, Microsoft, Tesla), indexes them at page-level granularity, and answers natural-language financial questions with **grounded, source-cited, explainable responses**.
 
 The system provides intelligent retrieval with metadata filtering, explainable responses with source citations, multi-step reasoning for comparative queries, and a feedback loop for continuous improvement.
 
@@ -60,6 +60,7 @@ graph TB
 - **Graceful Degradation** — MockLLM/MockEmbedding fallback when no OpenAI API key is configured
 - **Input Validation** — question length (1–2000 chars), filter list limits; CORS restricted to known frontend origins
  - **Auto-ingestion & status banner** — documents are loaded automatically on backend startup; the UI shows when indexing is still running
+ - **Smart re-ingestion** — a corpus fingerprint detects added/removed/renamed PDFs and triggers automatic re-ingestion without manual intervention
 
 ---
 
@@ -153,15 +154,17 @@ At a high level:
 
 ## Data Corpus
 
-Six 10-K annual reports from SEC EDGAR, covering three companies across two fiscal years:
+Fifteen 10-K annual reports from SEC EDGAR, covering five companies across three fiscal years:
 
-| Company | FY 2024 | FY 2025 |
-|---------|---------|---------|
-| NVIDIA | `nvidia_2024.pdf` | `nvidia_2025.pdf` |
-| Alphabet (Google) | `google-2024.pdf` | `google_2025.pdf` |
-| Apple | `apple_2024.pdf` | `apple_2025.pdf` |
+| Company | FY 2023 | FY 2024 | FY 2025 |
+|---------|---------|---------|---------|
+| NVIDIA | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Alphabet (Google) | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Apple | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Microsoft | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Tesla | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
 
-All documents are publicly available and committed in the `data/` directory.
+All documents are publicly available and committed in the `data/` directory (organized by company subdirectory).
 
 ---
 

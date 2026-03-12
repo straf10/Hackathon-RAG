@@ -1,3 +1,5 @@
+import hashlib
+import json
 import logging
 import re
 import threading
@@ -14,7 +16,28 @@ from .pdf_parser import load_pdf_documents
 
 logger = logging.getLogger(__name__)
 
+_FINGERPRINT_FILE = settings.FEEDBACK_DB_DIR / "corpus_fingerprint.json"
+
 _ingest_lock = threading.Lock()
+
+
+def _compute_corpus_fingerprint(data_dir: Path) -> str:
+    """MD5 of the sorted (relative-path, size) list of PDFs in *data_dir*."""
+    files = sorted(data_dir.glob("**/*.pdf"))
+    entries = [(str(f.relative_to(data_dir)), f.stat().st_size) for f in files]
+    return hashlib.md5(json.dumps(entries).encode()).hexdigest()
+
+
+def _load_stored_fingerprint() -> str | None:
+    try:
+        return json.loads(_FINGERPRINT_FILE.read_text()).get("fingerprint")
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+
+
+def _save_fingerprint(fingerprint: str) -> None:
+    _FINGERPRINT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _FINGERPRINT_FILE.write_text(json.dumps({"fingerprint": fingerprint}))
 
 
 def _extract_metadata(file_path: str) -> dict:
@@ -58,6 +81,15 @@ def _run_ingestion_locked(force: bool) -> dict:
     )
     existing_count = chroma_collection.count()
 
+    current_fp = _compute_corpus_fingerprint(settings.DATA_DIR)
+    stored_fp = _load_stored_fingerprint()
+    if existing_count > 0 and not force and current_fp != stored_fp:
+        logger.info(
+            "Corpus fingerprint changed (%s → %s) — auto-forcing re-ingestion",
+            stored_fp, current_fp,
+        )
+        force = True
+
     if existing_count > 0 and not force:
         logger.info(
             "Collection '%s' already contains %d chunks — skipping ingestion "
@@ -97,6 +129,8 @@ def _run_ingestion_locked(force: bool) -> dict:
         storage_context=storage_context,
         embed_model=embed_model,
     )
+
+    _save_fingerprint(current_fp)
 
     result = {
         "status": "ok",

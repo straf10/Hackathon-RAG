@@ -16,8 +16,8 @@ from config import BACKEND_URL
 # ---------------------------------------------------------------------------
 # Constants & compiled patterns
 # ---------------------------------------------------------------------------
-COMPANIES = ["NVIDIA", "Google", "Apple"]
-YEARS = [2024, 2025]
+COMPANIES = ["NVIDIA", "Google", "Apple", "Microsoft", "Tesla"]
+YEARS = [2023, 2024, 2025]
 
 _SUB_Q_RE = re.compile(
     r"^Sub question:\s*(?P<question>.+?)\s*Response:\s*(?P<response>.+)",
@@ -593,9 +593,11 @@ elif st.session_state.page == "load_documents":
     st.divider()
     st.subheader("Available Documents")
     st.markdown(
-        "| Company | FY 2024 | FY 2025 |\n"
-        "|---------|---------|---------|\n"
-        "| NVIDIA | `nvidia_2024.pdf` | `nvidia_2025.pdf` |\n"
-        "| Alphabet (Google) | `google-2024.pdf` | `google_2025.pdf` |\n"
-        "| Apple | `apple_2024.pdf` | `apple_2025.pdf` |"
+        "| Company | FY 2023 | FY 2024 | FY 2025 |\n"
+        "|---------|---------|---------|---------|\n"
+        "| NVIDIA | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |\n"
+        "| Alphabet (Google) | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |\n"
+        "| Apple | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |\n"
+        "| Microsoft | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |\n"
+        "| Tesla | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |"
     )
