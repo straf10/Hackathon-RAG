@@ -59,102 +59,52 @@ graph TB
 - **User Feedback** — thumbs up/down on every response for continuous improvement signals
 - **Graceful Degradation** — MockLLM/MockEmbedding fallback when no OpenAI API key is configured
 - **Input Validation** — question length (1–2000 chars), filter list limits; CORS restricted to known frontend origins
+ - **Auto-ingestion & status banner** — documents are loaded automatically on backend startup; the UI shows when indexing is still running
 
 ---
 
 ## How to Run the Project
 
-### Prerequisites
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
-- An OpenAI API key (provided by hackathon organizers)
-
-Verify Docker is available:
+### 1. Setup & Run
 
 ```bash
-docker --version
-docker compose version
-```
-
-### 1. Clone the repository
-
-```bash
+# Clone the repository
 git clone <repo-url>
 cd Hackathon-RAG
-```
 
-### 2. Create the `.env` file
+# Create your .env file
+echo "OPENAI_API_KEY=sk-your-key-here" > .env
 
-Create a `.env` file in the project root:
-
-```
-OPENAI_API_KEY=sk-your-key-here
-```
-
-> The `.env` file is gitignored and never committed. Each team member creates it locally.
-
-### 3. Start the system
-
-```bash
+# Build and start the system
 docker compose up --build
 ```
 
-The first build downloads base images and installs dependencies (3–5 minutes). Subsequent starts are faster.
+> **Windows (PowerShell) builds**: To speed up subsequent builds, set once in PowerShell:
+> ```powershell
+> $env:DOCKER_BUILDKIT = "1"
+> $env:COMPOSE_DOCKER_CLI_BUILD = "1"
+> ```
 
-### 3a. Clean rebuild and faster subsequent builds (Windows PowerShell)
+### 2. Open the app
 
-Use this when you want to clear the project images and measure build performance on Windows:
+- **Frontend**: `http://localhost:8501`
+- **Backend health**: `http://localhost:8000`
+- **ChromaDB**: `http://localhost:8100`
 
-```powershell
-cd C:\Python\Hackathon-RAG
-$env:DOCKER_BUILDKIT = "1"
-$env:COMPOSE_DOCKER_CLI_BUILD = "1"
+### 3. Let the index warm up (auto-ingestion)
 
-# 1) One true cold build (no cache)
-docker compose build --no-cache   # measure this once
+On backend startup, the 10-K PDFs are ingested automatically in the background:
 
-# 2) Cached builds (typical workflow)
-docker compose build              # measure
-docker compose build              # measure again
-```
+- The frontend periodically calls `GET /ingest/status` and shows a banner like **"Index warming up — documents are being loaded in the background. You can still use the app."**
+- You can start chatting immediately; results improve once indexing has finished and the banner disappears.
 
-- **First clean run**: use the `--no-cache` command once to get a baseline for a full cold build.
-- **Following runs**: use the regular `docker compose build` commands (with cache) for much faster rebuilds during development.
+### 4. (Optional) Reload documents from the UI
 
-### 4. Verify all services
+Use this if you change PDFs or want to force a rebuild:
 
-| Service | URL | Expected |
-|---------|-----|----------|
-| Backend | http://localhost:8000 | `{"message": "Financial RAG Backend is running"}` |
-| Frontend | http://localhost:8501 | Streamlit Chat UI |
-| ChromaDB | http://localhost:8100 | ChromaDB API root |
-
-### 5. Ingest the documents
-
-Before querying, you need to ingest the 10-K documents. You can do this in either of two ways:
-
-- **Streamlit UI** — Open http://localhost:8501 and click **Ingest Documents** in the sidebar. This processes all 6 PDFs, creates ~800 chunks with metadata, generates embeddings, and stores them in ChromaDB.
-- **Ingest API** — Trigger the ingestion pipeline via `POST http://localhost:8000/ingest` (e.g. using a REST client like Postman, or from your own script).
-
-Ingestion takes 2–5 minutes depending on hardware.
-
-### 6. Start asking questions
-
-Open http://localhost:8501 and use the chat interface. Use the sidebar filters to narrow results by company and year. Enable **Sub-question decomposition** for complex comparative queries.
-
-### Stopping the system
-
-Press **Ctrl+C** in the terminal, or run:
-
-```bash
-docker compose down
-```
-
-Data persists in the `chroma_data` Docker volume across restarts. To fully reset:
-
-```bash
-docker compose down -v
-```
+- Open the **Documents** page in the left sidebar.
+- (Optional) enable **Force re-ingest** to rebuild even if data already exists.
+- Click **Load Documents** to trigger a manual ingest (`POST /ingest`).
 
 ---
 
@@ -166,7 +116,7 @@ docker compose down -v
 - *What are the main risk factors mentioned in NVIDIA's 10-K?*
 - *How many employees does Apple have?*
 
-### Complex questions (enable Sub-question decomposition)
+### Complex questions (multi-step reasoning is automatic)
 
 - *Compare Apple and Google's net income for 2025.*
 - *How did Alphabet's advertising revenue change between 2024 and 2025?*
@@ -178,49 +128,12 @@ docker compose down -v
 
 ## How It Works
 
-### Ingestion Pipeline
+At a high level:
 
-```
-10-K PDFs (data/nvidia/, data/google/, data/apple/)
-        │
-        ▼
-  PyMuPDFReader — per-page text extraction
-        │
-        ▼
-  SentenceSplitter — chunk_size=1024, overlap=200
-        │
-        ▼
-  Metadata Enrichment — company, year, doc_type, source_file
-        │
-        ▼
-  OpenAI text-embedding-3-small — 1536-dim dense vectors
-        │
-        ▼
-  ChromaDB — persistent storage with metadata index
-```
-
-Each PDF page becomes one or more chunks. Every chunk carries metadata (company name, fiscal year, document type, source filename) enabling precise filtered retrieval.
-
-### Query Pipeline
-
-```
-User question + optional filters (company, year)
-        │
-        ▼
-  Metadata Filter Construction — FilterOperator.IN + FilterCondition.AND
-        │
-        ▼
-  Semantic Retrieval — top-5 chunks from ChromaDB
-        │
-        ▼
-  (Optional) Sub-Question Decomposition — breaks complex queries into sub-questions
-        │
-        ▼
-  LLM Synthesis (gpt-4.1) — grounded answer from retrieved context only
-        │
-        ▼
-  Structured Response — answer + source citations (filename, page, score, snippet)
-```
+1. 10-K PDFs are split into text chunks and tagged with company and year.
+2. Each chunk is embedded and stored in ChromaDB.
+3. When you ask a question, the most relevant chunks are retrieved.
+4. The LLM answers using only the retrieved context and returns citations (file + page).
 
 ---
 
@@ -259,6 +172,7 @@ All documents are publicly available and committed in the `data/` directory.
 | `GET` | `/` | Health message |
 | `GET` | `/health` | Health check |
 | `GET` | `/usage` | API token usage and estimated cost |
+| `GET` | `/ingest/status` | Auto-ingestion status used by the frontend banner |
 | `POST` | `/query` | Execute a RAG query (429 if budget exhausted; 422 if validation fails) |
 | `POST` | `/ingest` | Trigger document ingestion (returns `already_running` if concurrent) |
 | `POST` | `/feedback` | Submit user feedback on a response |
@@ -297,61 +211,14 @@ All services communicate over an internal Docker network. ChromaDB data persists
 
 ## Testing
 
-The backend includes a comprehensive test suite (242 tests) built with **pytest**. Tests run locally without Docker, ChromaDB, or an OpenAI API key — all external dependencies are mocked.
-
-### Run all tests
+The backend includes a pytest test suite.
 
 ```bash
 cd backend
-python -m pytest tests/ -v --tb=short
+python -m pytest -v
 ```
 
-### Run specific test categories
-
-```bash
-# Smoke tests — health, root, usage, shutdown
-python -m pytest tests/test_health.py -v
-
-# Schema validation — all Pydantic models
-python -m pytest tests/test_schemas.py -v
-
-# Query router — API key guard, budget, error handling
-python -m pytest tests/test_query_router.py -v
-
-# Ingestion — ingest endpoint + metadata extraction
-python -m pytest tests/test_ingest_router.py -v
-
-# Feedback — POST/GET feedback endpoints
-python -m pytest tests/test_feedback_router.py -v
-
-# RAG engine — filter building, response formatting
-python -m pytest tests/test_rag_engine.py -v
-
-# Edge cases — null inputs, type mismatches, malformed data
-python -m pytest tests/test_edge_cases.py -v
-
-# E2E integration — real PDF loading, full API flow, contract compliance
-python -m pytest tests/test_e2e_integration.py -v
-
-# Performance — 15-second latency enforcement (NFR-05)
-python -m pytest tests/test_performance.py -v
-```
-
-### Test coverage summary
-
-| Category | File | Tests | What it covers |
-|----------|------|-------|----------------|
-| Smoke | `test_health.py` | 14 | `/`, `/health`, `/usage`, `/shutdown`, 404s |
-| Schemas | `test_schemas.py` | 43 | All 9 Pydantic models: boundaries, nulls, types, round-trips |
-| Query | `test_query_router.py` | 53 | API-key guard, budget, mock detection, OpenAI errors, success |
-| Ingest | `test_ingest_router.py` | 19 | Ingest success/skip/lock, error paths, metadata extraction |
-| Feedback | `test_feedback_router.py` | 17 | Submit, validate, stats, recent, persistence failure |
-| RAG Engine | `test_rag_engine.py` | 18 | Filter building, response formatting, score rounding |
-| Edge Cases | `test_edge_cases.py` | 44 | Malformed JSON, type coercion, filter passthrough, Unicode |
-| E2E | `test_e2e_integration.py` | 25 | Real PDF parsing, chunking, full flow, contract compliance |
-| Performance | `test_performance.py` | 9 | Hard 15s latency limit, simulated delays, endpoint speed |
-
-For detailed test descriptions, audit findings, and the full testing methodology, see [Project_Specification.md §13](Project_Specification.md#13-testing).
+For more detailed test information, see `Project_Specification.md`.
 
 ---
 
