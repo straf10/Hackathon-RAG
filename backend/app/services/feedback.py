@@ -59,14 +59,15 @@ def save_feedback(
     comment: str | None,
 ) -> None:
     conn = _get_conn()
-    conn.execute(
-        """
-        INSERT INTO feedback (feedback_id, query_id, rating, comment, created_at)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (feedback_id, query_id, rating, comment, datetime.now(timezone.utc).isoformat()),
-    )
-    conn.commit()
+    with _db_lock:
+        conn.execute(
+            """
+            INSERT INTO feedback (feedback_id, query_id, rating, comment, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (feedback_id, query_id, rating, comment, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
     logger.info("Feedback persisted: id=%s query=%s rating=%s", feedback_id, query_id, rating)
 
 

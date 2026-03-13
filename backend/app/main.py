@@ -13,8 +13,9 @@ from .utils.token_tracker import persist as persist_usage
 async def lifespan(app: FastAPI):
     install_token_tracking()
     query.init_engine()
-    asyncio.create_task(ingest.auto_ingest_on_startup())
+    task = asyncio.create_task(ingest.auto_ingest_on_startup())
     yield
+    task.cancel()
     persist_usage()
 
 
@@ -29,8 +30,8 @@ _ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 app.include_router(query.router)

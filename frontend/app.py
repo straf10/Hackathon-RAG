@@ -16,9 +16,6 @@ from config import BACKEND_URL
 # ---------------------------------------------------------------------------
 # Constants & compiled patterns
 # ---------------------------------------------------------------------------
-COMPANIES = ["NVIDIA", "Google", "Apple", "Microsoft", "Tesla"]
-YEARS = [2023, 2024, 2025]
-
 _SUB_Q_RE = re.compile(
     r"^Sub question:\s*(?P<question>.+?)\s*Response:\s*(?P<response>.+)",
     re.IGNORECASE | re.DOTALL,

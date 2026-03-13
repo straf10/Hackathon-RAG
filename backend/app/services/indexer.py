@@ -161,12 +161,3 @@ def _run_ingestion_locked(force: bool) -> dict:
     }
     logger.info("Ingestion complete: %s", result)
     return result
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)-7s | %(message)s",
-        datefmt="%H:%M:%S",
-    )
-    run_ingestion()

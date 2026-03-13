@@ -58,7 +58,8 @@ def init_engine() -> None:
 
 
 def get_engine() -> RAGEngine:
-    assert _engine is not None, "RAGEngine not initialized (startup failed?)"
+    if _engine is None:
+        raise RuntimeError("RAGEngine not initialized (startup failed?)")
     return _engine
 
 

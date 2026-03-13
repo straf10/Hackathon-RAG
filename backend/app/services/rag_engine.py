@@ -10,7 +10,11 @@ import logging
 
 import chromadb.errors
 from llama_index.core import VectorStoreIndex
-from llama_index.core.query_engine import SubQuestionQueryEngine
+from llama_index.core.query_engine import (
+    BaseQueryEngine,
+    CustomQueryEngine,
+    SubQuestionQueryEngine,
+)
 from llama_index.core.question_gen import LLMQuestionGenerator
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.postprocessor import SimilarityPostprocessor
@@ -27,6 +31,47 @@ from ..utils.chroma import COLLECTION_NAME, connect_chroma
 from ..utils.models import get_embed_model, get_llm
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Retry-on-empty wrapper
+# ---------------------------------------------------------------------------
+
+_EMPTY_ANSWERS = frozenset(("", "none", "empty response"))
+
+
+class RetryOnEmptyQueryEngine(CustomQueryEngine):
+    """Wraps a primary query engine and retries with a fallback engine when
+    the primary returns an empty response (no source nodes or a vacuous
+    answer).  Used to transparently lower the similarity cutoff on a
+    per-sub-question basis."""
+
+    primary: BaseQueryEngine
+    fallback: BaseQueryEngine
+
+    def custom_query(self, query_str: str):
+        response = self.primary.query(query_str)
+        if self._is_empty(response):
+            logger.info(
+                "Sub-question returned empty response — retrying with lower similarity cutoff"
+            )
+            response = self.fallback.query(query_str)
+        return response
+
+    async def acustom_query(self, query_str: str):
+        response = await self.primary.aquery(query_str)
+        if self._is_empty(response):
+            logger.info(
+                "Sub-question returned empty response — retrying with lower similarity cutoff (async)"
+            )
+            response = await self.fallback.aquery(query_str)
+        return response
+
+    @staticmethod
+    def _is_empty(response) -> bool:
+        nodes = getattr(response, "source_nodes", [])
+        answer = str(response).strip().lower()
+        return not nodes or answer in _EMPTY_ANSWERS
 
 
 # ---------------------------------------------------------------------------
@@ -125,19 +170,23 @@ class RAGEngine:
         self,
         filters: MetadataFilters | None = None,
         similarity_top_k: int = 10,
+        similarity_cutoff: float | None = None,
     ):
         """Build a standard single-step query engine with optional
         metadata pre-filtering and a cosine-similarity score threshold."""
+        cutoff = similarity_cutoff if similarity_cutoff is not None else self._SIMILARITY_CUTOFF
         kwargs: dict = {
             "llm": self.llm,
             "similarity_top_k": similarity_top_k,
             "node_postprocessors": [
-                SimilarityPostprocessor(similarity_cutoff=self._SIMILARITY_CUTOFF),
+                SimilarityPostprocessor(similarity_cutoff=cutoff),
             ],
         }
         if filters is not None:
             kwargs["filters"] = filters
         return self._index.as_query_engine(**kwargs)
+
+    _RETRY_SIMILARITY_CUTOFF = 0.66
 
     def _get_sub_question_engine(
         self,
@@ -147,10 +196,23 @@ class RAGEngine:
         """``SubQuestionQueryEngine`` decomposes a complex question into
         simpler sub-questions, runs each against the base engine, and merges
         the answers.  Best for comparison queries such as
-        *"Compare NVIDIA revenue 2024 vs 2025"*."""
-        base_engine = self._get_query_engine(
+        *"Compare NVIDIA revenue 2024 vs 2025"*.
+
+        Each sub-question is handled by a ``RetryOnEmptyQueryEngine`` that
+        first queries at the default similarity cutoff and, if the response
+        is empty, retries with a lower cutoff to broaden recall."""
+        primary_engine = self._get_query_engine(
             filters=filters,
             similarity_top_k=similarity_top_k,
+        )
+        fallback_engine = self._get_query_engine(
+            filters=filters,
+            similarity_top_k=similarity_top_k,
+            similarity_cutoff=self._RETRY_SIMILARITY_CUTOFF,
+        )
+        base_engine = RetryOnEmptyQueryEngine(
+            primary=primary_engine,
+            fallback=fallback_engine,
         )
         tool = QueryEngineTool(
             query_engine=base_engine,
