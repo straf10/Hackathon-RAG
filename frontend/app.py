@@ -88,7 +88,7 @@ st.markdown(
         padding-top: 8vh;
     }
     .hero-heading {
-        font-size: 1.8rem;
+        font-size: 2.2rem;
         font-weight: 700;
         color: #ffffff;
         margin-bottom: 0.5rem;
@@ -318,7 +318,7 @@ with st.sidebar:
         '<div class="sidebar-logo">LEXIO</div>',
         unsafe_allow_html=True,
     )
-    st.caption("10-K Financial Knowledge Base")
+    st.caption("Financial Knowledge Base")
     st.divider()
 
     _NAV = [
@@ -414,7 +414,7 @@ if st.session_state.page == "app":
     if st.session_state.show_hero and not st.session_state.messages:
         st.markdown(
             '<div class="hero-container">'
-            "<div class=\"hero-heading\">What's on your mind</div>"
+            "<div class=\"hero-heading\">What's on your mind?</div>"
             "</div>",
             unsafe_allow_html=True,
         )
