@@ -1,12 +1,14 @@
-# PageIndex RAG — 10-K Financial Document Analysis
+# Lexio — PageIndex RAG for Financial Document Analysis
 
 ## What This Project Does
 
 Financial analysts spend hours manually searching through SEC 10-K filings — documents that routinely exceed 200 pages — to extract revenue figures, risk factors, segment breakdowns, and year-over-year comparisons. The information is buried across disparate sections, inconsistent formatting, and legal boilerplate.
 
-**PageIndex RAG** is a Retrieval-Augmented Generation (RAG) system that solves this problem. It ingests 10-K annual reports from major public companies (NVIDIA, Alphabet/Google, Apple, Microsoft, Tesla), indexes them at page-level granularity, and answers natural-language financial questions with **grounded, source-cited, explainable responses**.
+**Lexio** is a **PageIndex RAG** — a Retrieval-Augmented Generation system that indexes and cites documents at **page-level granularity**. Unlike typical RAG systems that chunk by fixed token windows (e.g., 512 tokens) and often cite vague "document X" references, PageIndex RAG keeps every chunk tied to its source page. Each answer includes **exact page numbers** (e.g., *"NVIDIA 10-K 2024, page 42"*), so analysts can open the PDF and jump straight to the cited location instead of hunting through hundreds of pages.
 
-The system provides intelligent retrieval with metadata filtering, explainable responses with source citations, multi-step reasoning for comparative queries, and a feedback loop for continuous improvement.
+Lexio ingests 10-K annual reports from major public companies (NVIDIA, Alphabet/Google, Apple, Microsoft, Tesla) and answers natural-language financial questions with **grounded, source-cited, explainable responses**. Instead of sifting through thousands of pages, analysts simply ask a question — *"Compare NVIDIA and Google revenue for 2024 and 2025"* — and receive a structured answer with exact page references, relevance scores, and automatic data visualizations. Complex comparative queries are decomposed into sub-questions behind the scenes, each resolved independently and merged into a coherent response.
+
+The system provides intelligent retrieval with metadata filtering, explainable responses with source citations, and multi-step reasoning for comparative queries.
 
 Built for **Netcompany Hackathon Thessaloniki 2026** — Challenge 2: AI-Powered Knowledge Base.
 
@@ -15,97 +17,100 @@ Built for **Netcompany Hackathon Thessaloniki 2026** — Challenge 2: AI-Powered
 ## Architecture
 
 ```mermaid
-graph TB
-    subgraph docker["Docker Compose"]
-        subgraph frontendSvc["Frontend · Streamlit :8501"]
-            UI["Chat UI · Filters · Charts · Feedback"]
-        end
-        subgraph backendSvc["Backend · FastAPI :8000"]
-            API["REST API"]
-            RAG["LlamaIndex RAG Engine"]
-            SubQ["Sub-Question Decomposition"]
-            Ingest["PDF Ingestion Pipeline"]
-            FB["Feedback Service"]
-        end
-        subgraph chromaSvc["ChromaDB :8000"]
-            VDB[("Vector Storage<br/>financial_10k collection")]
-        end
+graph LR
+    User((User)) --> UI
+
+    subgraph Frontend["Streamlit :8501"]
+        UI["Chat · Filters · Charts · Analytics"]
     end
 
-    User((User)) -->|"Natural language query<br/>+ company/year filters"| UI
-    UI -->|"HTTP POST /query"| API
-    API --> RAG
-    RAG -->|"Semantic search<br/>with metadata filtering"| VDB
-    RAG -->|"gpt-4.1"| OpenAI["OpenAI API"]
-    SubQ -.->|"Multi-step reasoning"| RAG
-    Ingest -->|"Embed + store chunks"| VDB
-    Ingest -->|"PyMuPDFReader"| Data[("data/<br/>10-K PDFs")]
-    UI -->|"HTTP POST /feedback"| FB
+    subgraph Backend["FastAPI :8000"]
+        API["REST API + Token Budget"]
+        RAG["RAG Engine"]
+        SubQ["Sub-Question Engine"]
+        Ingest["Ingestion + Fingerprinting"]
+    end
 
-    style docker fill:#1a1a2e,stroke:#16213e,color:#fff
-    style frontendSvc fill:#0f3460,stroke:#533483,color:#fff
-    style backendSvc fill:#0f3460,stroke:#533483,color:#fff
-    style chromaSvc fill:#533483,stroke:#e94560,color:#fff
+    subgraph ChromaDB["ChromaDB :8100"]
+        VDB[("financial_10k")]
+    end
+
+    Data[("15 × 10-K PDFs")]
+    OpenAI["OpenAI API"]
+
+    UI -->|"/query"| API
+    API --> RAG
+    RAG -->|"Semantic search"| VDB
+    RAG -->|"gpt-4.1"| OpenAI
+    SubQ -.->|"Decompose & merge"| RAG
+    Ingest -->|"Embed + store"| VDB
+    Ingest -->|"PyMuPDF"| Data
+
+    style Frontend fill:#0f3460,stroke:#533483,color:#fff
+    style Backend fill:#0f3460,stroke:#533483,color:#fff
+    style ChromaDB fill:#533483,stroke:#e94560,color:#fff
     style OpenAI fill:#412057,stroke:#e94560,color:#fff
 ```
 
+---
+
 ## Key Features
 
-- **Intelligent Retrieval** — semantic vector search with metadata filtering by company and fiscal year
-- **Explainable Responses** — every answer includes source citations (filename, page number, relevance score, text snippet)
-- **Multi-Step Reasoning** — sub-question decomposition for comparative queries (e.g. *"Compare NVIDIA vs Google revenue"*)
-- **Financial Visualization** — automatic table and bar chart rendering when responses contain numerical data
-- **API Usage Tracking** — token counts and estimated cost via `/usage`; budget enforcement (HTTP 429 when exhausted)
-- **User Feedback** — thumbs up/down on every response for continuous improvement signals
-- **Graceful Degradation** — MockLLM/MockEmbedding fallback when no OpenAI API key is configured
-- **Input Validation** — question length (1–2000 chars), filter list limits; CORS restricted to known frontend origins
- - **Auto-ingestion & status banner** — documents are loaded automatically on backend startup; the UI shows when indexing is still running
- - **Smart re-ingestion** — a corpus fingerprint detects added/removed/renamed PDFs and triggers automatic re-ingestion without manual intervention
+- **Intelligent Retrieval** — semantic vector search with metadata filtering by company, fiscal year, and document type
+- **Explainable Responses** — every answer includes source citations with filename, page number, relevance score, and text snippet
+- **Multi-Step Reasoning** — sub-question decomposition automatically breaks comparative queries into independent sub-questions, resolves each, and merges the results (e.g. *"Compare NVIDIA vs Google revenue"*)
+- **Financial Visualization** — automatic table extraction and bar chart rendering when responses contain numerical data
+- **Token Usage & Budget** — real-time token tracking (prompt, completion, embedding) with estimated cost and a $10 budget cap (HTTP 429 when exhausted)
+- **Smart Re-ingestion** — an MD5 corpus fingerprint detects added, removed, or renamed PDFs and triggers automatic re-ingestion without manual intervention
+- **Auto-ingestion on Startup** — documents are loaded automatically when the backend starts; the UI shows a status banner until indexing completes
+- **Graceful Degradation** — MockLLM / MockEmbedding fallback when no OpenAI API key is configured, so the system runs anywhere
+- **Input Validation** — question length (1–2 000 chars), filter list limits (max 10); CORS restricted to known frontend origins
 
 ---
 
-## How to Run the Project
+## How to Run
 
-### 1. Setup & Run
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- An OpenAI API key
+
+### 1. Clone and configure
 
 ```bash
-# Clone the repository
 git clone <repo-url>
 cd Hackathon-RAG
+```
 
-# Create your .env file
-echo "OPENAI_API_KEY=sk-your-key-here" > .env
+Create a `.env` file in the project root with your API key:
 
-# Build and start the system
+```
+OPENAI_API_KEY=sk-your-key-here
+```
+
+### 2. Start the system
+
+```bash
 docker compose up --build
 ```
 
-> **Windows (PowerShell) builds**: To speed up subsequent builds, set once in PowerShell:
+That's it — all three services (backend, frontend, vector database) start automatically.
+
+### 3. Open the app
+
+| Service  | URL                        |
+| -------- | -------------------------- |
+| Frontend | `http://localhost:8501`    |
+| Backend  | `http://localhost:8000`    |
+| ChromaDB | `http://localhost:8100`    |
+
+On first launch, the backend automatically ingests all 15 PDFs in the background. A banner in the UI shows progress — you can start chatting immediately and results improve once indexing completes.
+
+> **Tip (Windows/PowerShell):** Speed up subsequent builds by enabling BuildKit:
 > ```powershell
 > $env:DOCKER_BUILDKIT = "1"
 > $env:COMPOSE_DOCKER_CLI_BUILD = "1"
 > ```
-
-### 2. Open the app
-
-- **Frontend**: `http://localhost:8501`
-- **Backend health**: `http://localhost:8000`
-- **ChromaDB**: `http://localhost:8100`
-
-### 3. Let the index warm up (auto-ingestion)
-
-On backend startup, the 10-K PDFs are ingested automatically in the background:
-
-- The frontend periodically calls `GET /ingest/status` and shows a banner like **"Index warming up — documents are being loaded in the background. You can still use the app."**
-- You can start chatting immediately; results improve once indexing has finished and the banner disappears.
-
-### 4. (Optional) Reload documents from the UI
-
-Use this if you change PDFs or want to force a rebuild:
-
-- Open the **Documents** page in the left sidebar.
-- (Optional) enable **Force re-ingest** to rebuild even if data already exists.
-- Click **Load Documents** to trigger a manual ingest (`POST /ingest`).
 
 ---
 
@@ -129,99 +134,98 @@ Use this if you change PDFs or want to force a rebuild:
 
 ## How It Works
 
-At a high level:
-
-1. 10-K PDFs are split into text chunks and tagged with company and year.
-2. Each chunk is embedded and stored in ChromaDB.
-3. When you ask a question, the most relevant chunks are retrieved.
-4. The LLM answers using only the retrieved context and returns citations (file + page).
+1. **Ingestion** — 10-K PDFs are parsed page-by-page with PyMuPDF, split into chunks (1 536 tokens, 256-token overlap), and tagged with metadata (company, year, document type, source file).
+2. **Embedding** — Each chunk is embedded using OpenAI `text-embedding-3-small` and stored in ChromaDB.
+3. **Retrieval** — When you ask a question, the most relevant chunks are retrieved via semantic similarity search with optional metadata filters.
+4. **Synthesis** — The LLM (GPT-4.1) answers using only the retrieved context and returns citations (file + page).
+5. **Sub-questions** — For comparative queries, the system decomposes the question into independent sub-questions, resolves each separately, and merges the answers.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Role |
-|-------|-----------|------|
-| Backend | Python 3.12 + FastAPI | Async REST API |
-| RAG Framework | LlamaIndex | Document ingestion, chunking, retrieval, synthesis |
-| LLM | OpenAI `gpt-4.1` | Answer generation from retrieved context |
-| Embeddings | OpenAI `text-embedding-3-small` | Dense vector generation (1536 dims) |
-| Vector Database | ChromaDB | Persistent vector storage with metadata index |
-| PDF Parsing | PyMuPDF (`pymupdf`) | Page-level text extraction |
-| Frontend | Streamlit | Chat interface with filters, citations, charts |
-| Feedback Storage | SQLite | Zero-config feedback persistence |
-| Containerization | Docker Compose | Three-service orchestration |
+| Layer            | Technology                      | Role                                               |
+| ---------------- | ------------------------------- | -------------------------------------------------- |
+| Backend          | Python 3.12 + FastAPI           | Async REST API                                     |
+| RAG Framework    | LlamaIndex                      | Document ingestion, chunking, retrieval, synthesis  |
+| LLM              | OpenAI `gpt-4.1`                | Answer generation from retrieved context            |
+| Embeddings       | OpenAI `text-embedding-3-small` | Dense vector generation (1 536 dims)                |
+| Vector Database  | ChromaDB                        | Persistent vector storage with metadata index       |
+| PDF Parsing      | PyMuPDF (`pymupdf`)             | Page-level text extraction                          |
+| Frontend         | Streamlit                       | Chat interface with filters, citations, charts      |
+| Containerization | Docker Compose                  | Three-service orchestration                         |
+
+---
 
 ## Data Corpus
 
 Fifteen 10-K annual reports from SEC EDGAR, covering five companies across three fiscal years:
 
-| Company | FY 2023 | FY 2024 | FY 2025 |
-|---------|---------|---------|---------|
-| NVIDIA | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Company           | FY 2023        | FY 2024        | FY 2025        |
+| ----------------- | -------------- | -------------- | -------------- |
+| NVIDIA            | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
 | Alphabet (Google) | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
-| Apple | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
-| Microsoft | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
-| Tesla | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Apple             | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Microsoft         | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
+| Tesla             | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
 
-All documents are publicly available and committed in the `data/` directory (organized by company subdirectory).
+All documents are publicly available and stored in the `data/` directory, organized by company subdirectory.
 
 ---
 
 ## API Reference
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/` | Health message |
-| `GET` | `/health` | Health check |
-| `GET` | `/usage` | API token usage and estimated cost |
-| `GET` | `/ingest/status` | Auto-ingestion status used by the frontend banner |
-| `POST` | `/query` | Execute a RAG query (429 if budget exhausted; 422 if validation fails) |
-| `POST` | `/ingest` | Trigger document ingestion (returns `already_running` if concurrent) |
-| `POST` | `/feedback` | Submit user feedback on a response |
-| `POST` | `/shutdown` | Persist data before stopping containers |
+| Method | Path               | Description                                                            |
+| ------ | ------------------ | ---------------------------------------------------------------------- |
+| `GET`  | `/`                | Health message                                                         |
+| `GET`  | `/health`          | Health check                                                           |
+| `GET`  | `/usage`           | API token usage and estimated cost                                     |
+| `GET`  | `/ingest/status`   | Auto-ingestion status used by the frontend banner                      |
+| `POST` | `/query`           | Execute a RAG query (429 if budget exhausted; 422 if validation fails) |
+| `POST` | `/ingest`          | Trigger document ingestion (returns `already_running` if concurrent)   |
+| `POST` | `/shutdown`        | Persist data before stopping containers                                |
 
-For full request/response schemas and additional endpoints (`/feedback/stats`, `/feedback/recent`), see [Project_Specification.md §6](Project_Specification.md#6-api-contract).
+For full request/response schemas, see [Project_Specification.md §6](Project_Specification.md#6-api-contract).
 
 ---
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | `""` | OpenAI API key. Without a valid `sk-` key, the system falls back to MockLLM/MockEmbedding. |
-| `CHROMA_HOST` | `localhost` | ChromaDB hostname. Set to `chromadb` inside Docker. |
-| `CHROMA_PORT` | `8100` | ChromaDB port. Set to `8000` inside Docker (internal port). |
-| `DATA_DIR` | (auto-detected) | Path to the `data/` directory containing 10-K PDFs. Set to `/app/data` in Docker. |
-| `FEEDBACK_DB_DIR` | `feedback_data/` | Path for SQLite feedback DB and token usage JSON. Set to `/app/feedback_data` in Docker. |
-| `BACKEND_URL` | `http://localhost:8000` | Backend URL used by the Streamlit frontend. Set to `http://backend:8000` in Docker. |
+| Variable          | Default                 | Description                                                                                |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| `OPENAI_API_KEY`  | `""`                    | OpenAI API key. Without a valid `sk-` key, the system falls back to MockLLM/MockEmbedding. |
+| `CHROMA_HOST`     | `localhost`             | ChromaDB hostname. Set to `chromadb` inside Docker.                                        |
+| `CHROMA_PORT`     | `8100`                  | ChromaDB port. Set to `8000` inside Docker (internal port).                                |
+| `DATA_DIR`        | (auto-detected)         | Path to the `data/` directory containing 10-K PDFs. Set to `/app/data` in Docker.          |
+| `APP_DATA_DIR`    | `app_data/`             | Path for token usage persistence and corpus fingerprint. Set to `/app/app_data` in Docker. |
+| `BACKEND_URL`     | `http://localhost:8000` | Backend URL used by the Streamlit frontend. Set to `http://backend:8000` in Docker.        |
 
 All environment variables are configured automatically in `docker-compose.yml`. The only manual step is creating the `.env` file with your OpenAI API key.
 
-For the full project structure, see [Project_Specification.md §10](Project_Specification.md#10-project-structure).
+---
 
 ## Docker Services
 
-| Service | Image | Ports | Purpose |
-|---------|-------|-------|---------|
-| `backend` | Build: `./backend` (python:3.12-slim) | 8000:8000 | FastAPI REST API + RAG engine |
-| `frontend` | Build: `./frontend` (python:3.12-slim) | 8501:8501 | Streamlit chat interface |
-| `chromadb` | `chromadb/chroma:1.5.2` | 8100:8000 | Persistent vector database |
+| Service    | Image                                  | Ports     | Purpose                       |
+| ---------- | -------------------------------------- | --------- | ----------------------------- |
+| `backend`  | Build: `./backend` (python:3.12-slim)  | 8000:8000 | FastAPI REST API + RAG engine |
+| `frontend` | Build: `./frontend` (python:3.12-slim) | 8501:8501 | Streamlit chat interface      |
+| `chromadb` | `chromadb/chroma:1.5.2`                | 8100:8000 | Persistent vector database    |
 
-All services communicate over an internal Docker network. ChromaDB data persists in the `chroma_data` named volume.
+All services communicate over an internal Docker network. ChromaDB data persists in the `chroma_data` named volume. Application data (token usage, corpus fingerprint) persists in the `app_data` named volume.
 
 ---
 
 ## Testing
 
-The backend includes a pytest test suite.
+The backend includes **203 automated tests** across 8 test files, runnable locally without Docker, ChromaDB, or an OpenAI API key (all external dependencies are mocked).
 
 ```bash
 cd backend
-python -m pytest -v
+python -m pytest tests/ -v
 ```
 
-For more detailed test information, see `Project_Specification.md`.
+For detailed test coverage by spec requirement, see [Project_Specification.md §13](Project_Specification.md#13-testing).
 
 ---
 

@@ -8,10 +8,6 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.schemas import (
-    FeedbackRecord,
-    FeedbackRequest,
-    FeedbackResponse,
-    FeedbackStatsResponse,
     IngestRequest,
     IngestResponse,
     QueryRequest,
@@ -210,95 +206,3 @@ class TestIngestResponse:
             IngestResponse(status="ok", documents_processed=6)
 
 
-# ===========================================================================
-# FeedbackRequest
-# ===========================================================================
-class TestFeedbackRequest:
-    def test_up_rating(self):
-        req = FeedbackRequest(query_id="q1", rating="up")
-        assert req.comment is None
-
-    def test_down_rating(self):
-        req = FeedbackRequest(query_id="q1", rating="down")
-        assert req.rating == "down"
-
-    def test_with_comment(self):
-        req = FeedbackRequest(query_id="q1", rating="up", comment="Great!")
-        assert req.comment == "Great!"
-
-    def test_invalid_rating_rejected(self):
-        with pytest.raises(ValidationError):
-            FeedbackRequest(query_id="q1", rating="neutral")
-
-    def test_missing_query_id_rejected(self):
-        with pytest.raises(ValidationError):
-            FeedbackRequest(rating="up")
-
-    def test_missing_rating_rejected(self):
-        with pytest.raises(ValidationError):
-            FeedbackRequest(query_id="q1")
-
-    def test_empty_query_id_accepted(self):
-        req = FeedbackRequest(query_id="", rating="up")
-        assert req.query_id == ""
-
-    def test_null_rating_rejected(self):
-        with pytest.raises(ValidationError):
-            FeedbackRequest(query_id="q1", rating=None)
-
-    def test_numeric_rating_rejected(self):
-        with pytest.raises(ValidationError):
-            FeedbackRequest(query_id="q1", rating=5)
-
-
-# ===========================================================================
-# FeedbackResponse
-# ===========================================================================
-class TestFeedbackResponse:
-    def test_construction(self):
-        resp = FeedbackResponse(status="ok", feedback_id="fb-1")
-        assert resp.feedback_id == "fb-1"
-
-    def test_missing_feedback_id_rejected(self):
-        with pytest.raises(ValidationError):
-            FeedbackResponse(status="ok")
-
-
-# ===========================================================================
-# FeedbackStatsResponse
-# ===========================================================================
-class TestFeedbackStatsResponse:
-    def test_construction(self):
-        resp = FeedbackStatsResponse(
-            total_queries=100, positive_percentage=75.0, negative_percentage=25.0,
-        )
-        assert resp.total_queries == 100
-
-    def test_zero_stats(self):
-        resp = FeedbackStatsResponse(
-            total_queries=0, positive_percentage=0.0, negative_percentage=0.0,
-        )
-        assert resp.total_queries == 0
-
-
-# ===========================================================================
-# FeedbackRecord
-# ===========================================================================
-class TestFeedbackRecord:
-    def test_construction(self):
-        rec = FeedbackRecord(
-            feedback_id="fb-1", query_id="q-1", rating="up",
-            created_at="2026-03-10T12:00:00Z",
-        )
-        assert rec.comment is None
-
-    def test_with_comment(self):
-        rec = FeedbackRecord(
-            feedback_id="fb-1", query_id="q-1", rating="down",
-            comment="Bad answer", created_at="2026-03-10T12:00:00Z",
-        )
-        assert rec.comment == "Bad answer"
-
-    def test_missing_created_at_rejected(self):
-        with pytest.raises(ValidationError):
-            FeedbackRecord(feedback_id="fb-1", query_id="q-1", rating="up")

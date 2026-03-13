@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     CHROMA_HOST: str = "localhost"
     CHROMA_PORT: int = 8100
     DATA_DIR: Path = _DEFAULT_DATA_DIR
-    FEEDBACK_DB_DIR: Path = _DEFAULT_DATA_DIR.parent / "feedback_data"
+    APP_DATA_DIR: Path = _DEFAULT_DATA_DIR.parent / "app_data"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -5,7 +5,7 @@ Counts all LLM (prompt + completion) and embedding tokens flowing through
 LlamaIndex, estimates cost based on model pricing, and exposes a snapshot
 via ``get_usage()``.
 
-Usage is persisted to a JSON file on the feedback_data volume so totals
+Usage is persisted to a JSON file on the app_data volume so totals
 survive container restarts.
 
 Call ``install()`` once at application startup — before any LlamaIndex
@@ -32,7 +32,7 @@ _EMBED_COST = 0.02            # text-embedding-3-small
 _BUDGET_USD = 10.00
 
 # ---- persistence ----------------------------------------------------------
-_USAGE_FILE = Path(app_settings.FEEDBACK_DB_DIR) / "token_usage.json"
+_USAGE_FILE = Path(app_settings.APP_DATA_DIR) / "token_usage.json"
 
 _historical: dict[str, int] = {"prompt": 0, "completion": 0, "embedding": 0}
 _persist_lock = threading.Lock()

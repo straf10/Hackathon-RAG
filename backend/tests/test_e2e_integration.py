@@ -141,7 +141,7 @@ class TestRealChunking:
 
 
 # ===========================================================================
-# E2E: Full /ingest -> /query -> /feedback flow (mocked externals)
+# E2E: Full /ingest -> /query flow (mocked externals)
 # ===========================================================================
 class TestFullApiFlow:
     """Simulate the complete user journey through the API.
@@ -152,7 +152,7 @@ class TestFullApiFlow:
 
     @patch("app.routers.ingest.persist_usage")
     @patch("app.routers.ingest.run_ingestion")
-    def test_ingest_then_query_then_feedback(self, mock_ingest, _persist):
+    def test_ingest_then_query(self, mock_ingest, _persist):
         mock_ingest.return_value = {
             "status": "ok",
             "documents_loaded": 6,
@@ -209,23 +209,6 @@ class TestFullApiFlow:
             assert isinstance(src["text_snippet"], str)
             assert src["source_type"] in ("document", "sub_question")
 
-        # Step 3: Feedback
-        query_id = query_body["query_id"]
-        with patch("app.routers.feedback.save_feedback") as mock_save:
-            resp = _client.post(
-                "/feedback",
-                json={"query_id": query_id, "rating": "up", "comment": "Accurate!"},
-            )
-        assert resp.status_code == 200
-        fb_body = resp.json()
-        assert fb_body["status"] == "ok"
-        assert isinstance(fb_body["feedback_id"], str)
-        uuid.UUID(fb_body["feedback_id"])
-
-        mock_save.assert_called_once()
-        assert mock_save.call_args.kwargs["query_id"] == query_id
-        assert mock_save.call_args.kwargs["rating"] == "up"
-
 
 # ===========================================================================
 # E2E: Response structure matches API contract
@@ -259,20 +242,6 @@ class TestResponseContractCompliance:
         body = _client.post("/ingest").json()
         required = {"status", "documents_processed", "chunks_created", "existing_chunks"}
         assert required.issubset(set(body.keys()))
-
-    @patch("app.routers.feedback.save_feedback")
-    def test_feedback_response_contract(self, _save):
-        body = _client.post(
-            "/feedback", json={"query_id": "q", "rating": "up"}
-        ).json()
-        assert set(body.keys()) == {"status", "feedback_id"}
-
-    @patch("app.routers.feedback.get_feedback_stats", return_value={
-        "total_queries": 0, "positive_percentage": 0.0, "negative_percentage": 0.0,
-    })
-    def test_feedback_stats_contract(self, _mock):
-        body = _client.get("/feedback/stats").json()
-        assert set(body.keys()) == {"total_queries", "positive_percentage", "negative_percentage"}
 
     def test_usage_contract(self):
         body = _client.get("/usage").json()

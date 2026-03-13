@@ -547,7 +547,7 @@ elif st.session_state.page == "load_documents":
     st.caption("Ingest 10-K annual reports into the knowledge base")
 
     force = st.checkbox(
-        "Force re-ingest",
+        "Force reload",
         value=False,
         key="ld_force",
         help="Rebuild the index even if documents were already loaded.",
@@ -567,7 +567,7 @@ elif st.session_state.page == "load_documents":
                         st.info(
                             f"Documents already loaded "
                             f"({data.get('existing_chunks', 0)} chunks). "
-                            f"Enable **Force re-ingest** to reload."
+                            f"Enable **Force reload** to re-index."
                         )
                     else:
                         st.success(

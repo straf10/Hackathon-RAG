@@ -16,7 +16,7 @@ from .pdf_parser import load_pdf_documents
 
 logger = logging.getLogger(__name__)
 
-_FINGERPRINT_FILE = settings.FEEDBACK_DB_DIR / "corpus_fingerprint.json"
+_FINGERPRINT_FILE = settings.APP_DATA_DIR / "corpus_fingerprint.json"
 
 _ingest_lock = threading.Lock()
 

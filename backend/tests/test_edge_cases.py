@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.models.schemas import QueryRequest, FeedbackRequest
+from app.models.schemas import QueryRequest
 from app.routers.query import _is_mock_output, _safe_int, router as query_router
 
 _app = FastAPI()
@@ -320,22 +320,3 @@ class TestQueryRequestEdgeCases:
         assert not hasattr(req, "unknown_field")
 
 
-# ===========================================================================
-# FeedbackRequest — edge-case validation
-# ===========================================================================
-class TestFeedbackRequestEdgeCases:
-    def test_very_long_comment_accepted(self):
-        req = FeedbackRequest(
-            query_id="q-1", rating="up", comment="x" * 10000
-        )
-        assert len(req.comment) == 10000
-
-    def test_empty_comment_accepted(self):
-        req = FeedbackRequest(query_id="q-1", rating="up", comment="")
-        assert req.comment == ""
-
-    def test_unicode_comment(self):
-        req = FeedbackRequest(
-            query_id="q-1", rating="down", comment="Κακή απάντηση"
-        )
-        assert "Κακή" in req.comment

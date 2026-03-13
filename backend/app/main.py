@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import feedback, ingest, query, usage
+from .routers import ingest, query, usage
 from .utils.token_tracker import install as install_token_tracking
 from .utils.token_tracker import persist as persist_usage
 
@@ -36,7 +36,6 @@ app.add_middleware(
 
 app.include_router(query.router)
 app.include_router(ingest.router)
-app.include_router(feedback.router)
 app.include_router(usage.router)
 
 

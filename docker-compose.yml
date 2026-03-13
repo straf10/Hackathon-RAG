@@ -5,13 +5,13 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-      - feedback_data:/app/feedback_data
+      - app_data:/app/app_data
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
       - DATA_DIR=/app/data
-      - FEEDBACK_DB_DIR=/app/feedback_data
+      - APP_DATA_DIR=/app/app_data
     depends_on:
       chromadb:
         condition: service_healthy
@@ -47,4 +47,4 @@ services:
 
 volumes:
   chroma_data:
-  feedback_data:
+  app_data:
