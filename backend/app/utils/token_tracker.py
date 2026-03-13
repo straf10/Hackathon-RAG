@@ -26,8 +26,8 @@ from ..config import settings as app_settings
 logger = logging.getLogger(__name__)
 
 # ---- pricing (USD per 1 M tokens) ----------------------------------------
-_LLM_INPUT_COST = 2.00        # gpt-4.1 input
-_LLM_OUTPUT_COST = 8.00       # gpt-4.1 output
+_LLM_INPUT_COST = 1.25       # gpt-4.1 input
+_LLM_OUTPUT_COST = 10.00       # gpt-4.1 output
 _EMBED_COST = 0.02            # text-embedding-3-small
 _BUDGET_USD = 10.00
 
@@ -65,7 +65,7 @@ def _save_historical() -> None:
 
 # ---- tokenizer -----------------------------------------------------------
 try:
-    _tokenizer = tiktoken.encoding_for_model("gpt-4.1").encode
+    _tokenizer = tiktoken.encoding_for_model("gpt-5.1").encode
 except KeyError:
     _tokenizer = tiktoken.get_encoding("cl100k_base").encode
 

@@ -76,7 +76,7 @@ Key Drivers:
 2023: Growth in Google Services (Search, YouTube ads) from increased user adoption, advertiser spending, and improved ad formats; Google Cloud revenue also increased.
 2024: Revenue growth from Google Services (Search, YouTube, subscriptions, platforms, devices) and Google Cloud, with expanded AI offerings boosting engagement and monetization. Non-advertising revenues grew faster than advertising.
 2025: Continued growth in Search, YouTube, Google Cloud (especially AI-driven solutions), and subscriptions/platforms/devices. AI integration (AI Overviews, AI Mode in Search, enterprise AI solutions) and a shift toward non-advertising revenues were significant contributors.  
-  
+
 **Summary Table**
 
 
@@ -93,7 +93,130 @@ Each company’s revenue growth was primarily driven by expansion in cloud and A
 
 12 reasoning steps + 114 sources.
 
+---
+
 ### GPT-5.1 Answer
+
+Here’s a side‑by‑side comparison and then a brief summary by company.
+
+---
+
+## **1. Revenue and YoY growth comparison**
+
+*All amounts in millions of U.S. dollars.*
+
+### **NVIDIA**
+
+
+| Fiscal year | Revenue | YoY change |
+| ----------- | ------- | ---------- |
+| 2023        | 26,974  | –          |
+| 2024        | 60,922  | **+126%**  |
+| 2025        | 130,500 | **+114%**  |
+
+
+- **Higher YoY growth:** 2023→2024 (126% vs. 114%)
+
+**Management‑described drivers**
+
+- **2023→2024**
+  - Massive increase in **Compute & Networking** revenue (up 215%), driven mainly by **Data Center**:
+    - **Compute revenue up 266%**, led by higher shipments of the **NVIDIA Hopper GPU computing platform** for:
+      - Training and inference of large language models (LLMs)
+      - Recommendation engines
+      - Generative AI applications
+    - **Networking revenue up 133%**, driven by higher **InfiniBand** shipments.
+  - **Gaming** grew 15%, helped by normalized channel inventories and stronger gaming demand, but was a secondary driver.
+- **2024→2025**
+  - Continued strong **Compute & Networking** growth (up 145%), again centered on **Data Center**:
+    - **Data Center computing revenue up 162%**, primarily from continued demand for the **Hopper computing platform**for LLMs, recommendation engines, and generative AI.
+    - **Data Center networking revenue up 51%**, driven by **“Ethernet for AI”** offerings, including the **Spectrum‑X end‑to‑end Ethernet platform**.
+  - **Graphics** up 6%, driven by **GeForce RTX 40 Series GPUs**.
+
+---
+
+### **Microsoft**
+
+
+| Fiscal year | Revenue | YoY change |
+| ----------- | ------- | ---------- |
+| 2023        | 211,915 | –          |
+| 2024        | 245,122 | **+16%**   |
+| 2025        | 281,724 | **+15%**   |
+
+
+- **Higher YoY growth:** 2023→2024 (≈16% vs. ≈15%)
+
+**Management‑described drivers**
+
+- **2023→2024**
+  - Revenue growth across **all three segments**:
+    - **Intelligent Cloud**: led by **Azure and other cloud services**.
+    - **Productivity and Business Processes**: led by **Office 365 Commercial**.
+    - **More Personal Computing**: led by **Gaming**.
+  - Within those segments:
+    - **Office Commercial products and cloud services**: Office 365 Commercial seat growth and higher revenue per user.
+    - **Microsoft 365 Consumer**: subscriber growth.
+    - **LinkedIn**: growth across all major lines.
+    - **Dynamics 365**: broad‑based workload growth.
+    - **Azure and other cloud services**: 30% revenue growth.
+- **2024→2025**
+  - Company‑wide:
+    - **Microsoft Cloud** revenue up 23% to $168.9B.
+    - **Server products and cloud services** up 23%, driven by **Azure and other cloud services** revenue growth of 34%.
+  - **Productivity and Business Processes**:
+    - **Microsoft 365 Commercial** revenue up 14%, with cloud revenue up 15%; driven by seat growth (especially SMB and frontline) and higher revenue per user, plus uplift from **Windows Commercial on‑premises** components and **Office 2024** transactional purchasing.
+    - **Microsoft 365 Consumer** revenue up 11%, driven by 11% cloud revenue growth, 8% subscriber growth (to 89M), and higher revenue per user from a **January 2025 price increase**.
+    - **LinkedIn** up 9% across all lines.
+    - **Dynamics products and cloud services** up 15%, led by **Dynamics 365** up 19%.
+  - **More Personal Computing & advertising**:
+    - **Windows OEM and Devices** up 3%.
+    - **Xbox content and services** up 16%.
+    - **Search and news advertising** (ex‑TAC) up 20%.
+
+---
+
+### **Alphabet (Google)**
+
+
+| Fiscal year | Revenue | YoY change |
+| ----------- | ------- | ---------- |
+| 2023        | 307,394 | –          |
+| 2024        | 350,018 | **+13.9%** |
+| 2025        | 402,836 | **+15.1%** |
+
+
+- **Higher YoY growth:** 2024→2025 (≈15.1% vs. ≈13.9%)
+
+**Management‑described drivers**
+
+For both 2023→2024 and 2024→2025, management points to the same core drivers:
+
+1. **Expansion and monetization of AI‑driven products and services**
+  - Increased user engagement with AI features (e.g., AI‑enhanced Search and enterprise AI solutions on Google Cloud Platform).
+  - A different monetization profile for these AI products relative to historical consumer and enterprise offerings, affecting growth rates and revenue mix.
+  - A strategy of prioritizing **user experience first, then monetization**, influencing the timing and pattern of revenue realization from new AI features.
+2. **Growth of non‑advertising revenue**
+  - Faster growth in **cloud, consumer subscriptions, platforms, and devices**, making them a larger share of total revenue.
+  - These lines typically have different characteristics and generally lower margins than advertising, shifting the overall business mix as they expand.
+3. **Advertising ecosystem and traffic acquisition costs (TAC)**
+  - TAC paid to distribution and Network partners is expected to grow with advertising revenues, implicitly tied to ongoing ad‑revenue expansion.
+  - The **TAC rate has been decreasing** primarily due to shifts in revenue mix, underscoring the importance of where within advertising and non‑advertising the growth is occurring.
+
+---
+
+## **2. Cross‑company takeaway**
+
+- **Highest YoY growth overall:** NVIDIA in 2023→2024 (~126%), driven by demand for **AI data‑center compute and networking (Hopper + InfiniBand)**.
+- **Cloud/AI as common growth engines:**
+  - NVIDIA: AI accelerators and AI networking.
+  - Microsoft: Azure‑led cloud growth plus Microsoft 365 and other SaaS offerings.
+  - Alphabet: AI‑enhanced products (Search, Cloud) and faster‑growing non‑ad businesses (cloud and subscriptions).
+- **Pattern of YoY growth:**
+  - NVIDIA and Microsoft had **stronger growth in 2023→2024** than in 2024→2025.
+  - Alphabet shows the opposite: **higher growth in 2024→2025** than in 2023→2024, with the same structural AI and non‑advertising drivers operating in both years.
+
+6 reasoning steps + 51 sources
 
 ---
 
@@ -104,8 +227,6 @@ Across **NVIDIA, Tesla, Microsoft, Alphabet (Google), and Apple**, determine whi
 **Total tokens (question):** ~70
 
 ### GPT-4.1 Answer
-
-
 
 Among NVIDIA, Tesla, Microsoft, Alphabet (Google), and Apple, the company with the highest R&D expense as a percentage of revenue in 2024 was NVIDIA. The next closest (runner-up) was Alphabet (Google).
 
@@ -151,14 +272,75 @@ For Alphabet, the slight decrease in R&D expense as a percentage of revenue was 
 
 In summary, NVIDIA had the highest R&D expense as a percentage of revenue in 2024, followed by Alphabet. For both companies, the R&D percentage of revenue declined from 2023 to 2025, mainly because revenue growth outpaced the growth in R&D spending, as described in their respective 10-K filings.
 
-
-
 Model created 4 reasoning steps all with empty responses and 0 sources. Answear produced by models prior knowledge not based on docs.  
 
-
-
+---
 
 ### GPT-5.1 Answer
+
+NVIDIA had the highest R&D expense as a percentage of revenue in 2024.
+
+**2024 R&D as % of revenue across the five companies**
+
+- NVIDIA: **14.2%**
+- Alphabet (Google): **14%**
+- Microsoft: **12%**
+- Apple: **8%**
+- Tesla: **5%**
+
+So NVIDIA is highest, with Microsoft as a close runner‑up.
+
+---
+
+## **NVIDIA – R&D as % of revenue and reasons for change (2023–2025)**
+
+**R&D as % of revenue**
+
+- **2023:** 27.2%
+- **2024:** 14.2%
+- **2025:** 9.9%
+
+**Narrative explanations from the 10‑K filings**
+
+- **2023 vs. 2022**  
+Main reasons for the increase in R&D expense (and higher percentage vs. earlier years):
+  > “The increase in research and development expense for fiscal year 2023 was primarily driven by increased compensation, employee growth, engineering development costs, and data center infrastructure.”
+- **2024 vs. 2023**  
+R&D dollars rose, but revenue grew much faster, so R&D as a % of revenue fell from 27.2% to 14.2%. The filing describes the drivers of higher operating expenses (including R&D) as:
+  > “The increase in research and development expenses and sales, general and administrative expenses for fiscal year 2024 was primarily driven by compensation and benefits, including stock-based compensation, reflecting employee growth and compensation increases.”
+- **2025 vs. 2024**  
+R&D dollars increased again, but revenue rose even more, so R&D as a % of revenue declined further from 14.2% to 9.9%. The filing attributes the R&D increase to:
+  > “The increases in research and development expenses for fiscal year 2025 were driven by a 32% increase in compensation and benefits, including stock-based compensation, reflecting employee growth and compensation increases, a 100% increase in compute and infrastructure, and a 234% increase in engineering development costs for new product introductions.”
+
+Overall for NVIDIA, R&D spending rose each year in absolute terms, driven mainly by higher compensation, compute/infrastructure, and engineering development costs, while rapid revenue growth drove the sharp decline in R&D as a percentage of revenue from 2023 to 2025.
+
+---
+
+## **Microsoft – R&D as % of revenue and reasons for change (2023–2025)**
+
+**R&D as % of revenue**
+
+- **2023:** 13%
+- **2024:** 12%
+- **2025:** 12%
+
+**Narrative explanations from the 10‑K filings**
+
+- **2023 vs. 2022**  
+R&D as a % of revenue increased from 12% to 13%. The filing explains the higher R&D expense as:
+  > “Research and development expenses increased $2.7 billion or 11% driven by investments in cloud engineering and LinkedIn.”
+- **2024 vs. 2023**  
+R&D as a % of revenue decreased from 13% to 12%, as revenue outpaced the 9% increase in R&D. The filing attributes the R&D increase to:
+  > “Research and development expenses increased $2.3 billion or 9% driven by Gaming, with 7 points of growth from the Activision Blizzard acquisition, and investments in cloud engineering.”
+- **2025 vs. 2024**  
+R&D as a % of revenue stayed at 12% while R&D dollars grew 10%. The filing describes what this spending covers and links related operating expense growth to cloud and AI work:
+  > “Research and development expenses also include technology development costs, including AI training and other infrastructure costs, third-party development and programming costs, and the amortization of purchased software code and services content.”  
+  > And, for closely related expenses in Intelligent Cloud:  
+  > “Operating expenses increased $1.5 billion or 7% driven by investments in cloud and AI engineering.”
+
+For Microsoft, R&D expense grew each year, primarily due to investments in cloud, AI engineering, Gaming (including Activision Blizzard), and LinkedIn, while revenue growth kept R&D at roughly 12–13% of revenue over 2023–2025.
+
+15 reasoning steps + 96 sources
 
 ---
 
@@ -169,8 +351,6 @@ Using **Tesla** and **NVIDIA** 10‑Ks for **2024 and 2025**, identify **three r
 **Total tokens (question):** ~82
 
 ### GPT-4.1 Answer
-
-
 
 **Three risk factor themes present in both Tesla’s and NVIDIA’s 10-K filings for 2024 and 2025 are:**
 
@@ -247,13 +427,19 @@ Both companies maintain a strong focus on human capital risks in 2025, but the e
 | Human Capital Management       | Added emphasis on compliance and regulatory landscape              | Increased focus on competition for talent and risk of disruption |
 
 
-
-
 5 reasoning steps the last 2 with no response + 21 sources
+
+---
 
 
 
 ### GPT-5.1 Answer
+
+
+
+Request timed out. The query may be too complex — try simplifying or rephrasing the question.
+
+Sorry, I couldn’t get a response. Please check the backend connection.
 
 ---
 
@@ -264,8 +450,6 @@ Compare **Apple** and **Microsoft** from **2023 through 2025** on **net income**
 **Total tokens (question):** ~74
 
 ### GPT-4.1 Answer
-
-
 
 From 2023 through 2025, Apple and Microsoft both experienced growth in net income and operating margin, but the patterns and consistency of their profitability improvements differed.
 
@@ -313,13 +497,15 @@ From 2023 through 2025, Apple and Microsoft both experienced growth in net incom
 **Summary:**  
 Microsoft’s profitability improvements were more consistent year-over-year, with both net income and operating margin rising each year. Apple’s results were more variable, with a dip in net income and a slight operating margin decrease in 2025 after a strong 2024. The main drivers for both companies included revenue growth (especially in cloud and services), cost management, changes in operating expenses, and, for Apple, significant impacts from tax provisions and foreign currency. For Microsoft, investments in AI and cloud infrastructure became increasingly important in shaping margins by 2025.
 
-
-
 6 reasoning steps + 43 sources
 
-
+---
 
 ### GPT-5.1 Answer
+
+
+
+
 
 ---
 
@@ -330,8 +516,6 @@ From **2023 to 2025**, track **Alphabet (Google) advertising revenue** and **Mic
 **Total tokens (question):** ~77
 
 ### GPT-4.1 Answer
-
-
 
 From 2023 to 2025, Alphabet's (Google's) advertising revenue and Microsoft's cloud revenue (as reported in their respective SEC filings) were as follows:
 
@@ -386,11 +570,7 @@ Microsoft's cloud revenue grew faster than Alphabet's advertising revenue over t
 **Summary:**  
 Between 2023 and 2025, Microsoft's cloud segment grew at a significantly faster rate (about 51.4%) compared to Alphabet's advertising segment (about 23.9%). Alphabet's advertising revenue growth was driven by digital adoption, new ad formats, and AI integration, but was moderated by competition, lower monetization rates in new formats, macroeconomic factors, and regulatory changes. Microsoft's cloud revenue growth was propelled by Azure's expansion, demand for AI and hybrid solutions, and continued investment in cloud infrastructure, with some margin pressure from scaling AI capabilities.
 
-
-
 7 reasoning steps( 1 empty) - 51 sources
-
-
 
 ### GPT-5.1 Answer
 

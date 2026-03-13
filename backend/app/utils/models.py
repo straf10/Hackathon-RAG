@@ -53,9 +53,10 @@ def get_llm():
             from llama_index.llms.openai import OpenAI
 
             return OpenAI(
-                model="gpt-4.1",
+                model="gpt-5.1",
                 api_key=settings.OPENAI_API_KEY,
                 temperature=0.1,
+                reasoning_effort="low",
                 callback_manager=callback_manager,
             )
         except ImportError:
