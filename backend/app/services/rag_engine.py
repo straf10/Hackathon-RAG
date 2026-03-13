@@ -231,6 +231,7 @@ class RAGEngine:
             query_engine_tools=[tool],
             llm=self.llm,
             question_gen=question_gen,
+            use_async=False,  # Sequential execution to avoid OpenAI rate limits
         )
 
     # -- public API ---------------------------------------------------------
