@@ -41,3 +41,7 @@ chroma_data/
 # Misc
 *.log
 .cache/
+
+# Benchmark outputs
+benchmark.ipynb
+benchmark_results.png
