@@ -16,10 +16,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from llama_index.core.node_parser import SentenceSplitter
-
 from app.main import app
-from app.services.indexer import _extract_metadata, enrich_metadata
+from app.services.indexer import (
+    _documents_to_page_nodes,
+    _extract_metadata,
+    enrich_metadata,
+)
 from app.services.pdf_parser import load_pdf_documents
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -117,24 +119,27 @@ class TestRealMetadataEnrichment:
 # E2E: Chunking pipeline
 # ===========================================================================
 @pytest.mark.skipif(not _HAS_PDFS, reason="data/ directory with PDFs not found")
-class TestRealChunking:
-    """Verify the SentenceSplitter produces chunks from real documents."""
+class TestRealPageIndexing:
+    """Verify one-node-per-page indexing from real documents."""
 
     @pytest.fixture(scope="class")
-    def nodes(self):
+    def docs_and_nodes(self):
         docs = load_pdf_documents(_DATA_DIR)
         docs = enrich_metadata(docs)
-        splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200)
-        return splitter.get_nodes_from_documents(docs)
+        nodes = _documents_to_page_nodes(docs)
+        return docs, nodes
 
-    def test_produces_more_chunks_than_docs(self, nodes):
-        assert len(nodes) > 6
+    def test_one_node_per_page(self, docs_and_nodes):
+        docs, nodes = docs_and_nodes
+        assert len(nodes) == len(docs)
 
-    def test_chunks_have_text(self, nodes):
+    def test_nodes_have_text(self, docs_and_nodes):
+        _docs, nodes = docs_and_nodes
         for node in nodes[:20]:
             assert len(node.text) > 0
 
-    def test_chunks_inherit_metadata(self, nodes):
+    def test_nodes_inherit_metadata(self, docs_and_nodes):
+        _docs, nodes = docs_and_nodes
         for node in nodes[:20]:
             assert "company" in node.metadata
             assert "year" in node.metadata

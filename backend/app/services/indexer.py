@@ -5,9 +5,10 @@ import re
 import threading
 from pathlib import Path
 
+import tiktoken
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.embeddings import BaseEmbedding
-from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import TextNode
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from pydantic import PrivateAttr
 
@@ -146,6 +147,36 @@ def enrich_metadata(documents: list) -> list:
     return documents
 
 
+_MAX_EMBED_TOKENS = 8191
+
+try:
+    _enc = tiktoken.encoding_for_model("text-embedding-3-small")
+except KeyError:
+    _enc = tiktoken.get_encoding("cl100k_base")
+
+
+def _truncate_to_token_limit(text: str, max_tokens: int = _MAX_EMBED_TOKENS) -> str:
+    """Return *text* truncated so it fits within *max_tokens*."""
+    tokens = _enc.encode(text)
+    if len(tokens) <= max_tokens:
+        return text
+    return _enc.decode(tokens[:max_tokens])
+
+
+def _documents_to_page_nodes(documents: list) -> list[TextNode]:
+    """Convert each Document (one per PDF page) into a single TextNode.
+
+    Preserves all metadata and truncates text that exceeds the
+    embedding model's token limit (8 191 tokens for text-embedding-3-small).
+    """
+    nodes: list[TextNode] = []
+    for doc in documents:
+        text = _truncate_to_token_limit(doc.text)
+        node = TextNode(text=text, metadata=dict(doc.metadata))
+        nodes.append(node)
+    return nodes
+
+
 def run_ingestion(force: bool = False, status: dict | None = None) -> dict:
     if status is None:
         status = {}
@@ -207,9 +238,8 @@ def _run_ingestion_locked(force: bool, status: dict) -> dict:
     documents = enrich_metadata(documents)
     logger.info("Metadata enriched for %d documents", len(documents))
 
-    splitter = SentenceSplitter(chunk_size=1536, chunk_overlap=256)
-    nodes = splitter.get_nodes_from_documents(documents)
-    logger.info("Created %d chunks from %d documents", len(nodes), len(documents))
+    nodes = _documents_to_page_nodes(documents)
+    logger.info("Created %d page nodes from %d documents", len(nodes), len(documents))
 
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
