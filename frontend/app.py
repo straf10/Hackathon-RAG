@@ -264,23 +264,30 @@ def _fetch_usage() -> dict | None:
 @st.dialog("About this RAG", width="large")
 def _help_dialog():
     st.markdown(
-        "Financial analysts spend hours manually searching long SEC 10\u2011K "
-        "filings to extract revenue figures, risk factors, segment breakdowns, "
-        "and year\u2011over\u2011year comparisons. The information is buried in "
-        "hundreds of pages of legal and financial text."
+        "Financial analysts spend hours manually searching through SEC 10\u2011K "
+        "filings \u2014 documents that routinely exceed 200 pages \u2014 to extract "
+        "revenue figures, risk factors, segment breakdowns, and year\u2011over\u2011year "
+        "comparisons. The information is buried across disparate sections, "
+        "inconsistent formatting, and legal boilerplate."
     )
     st.markdown(
-        "Lexio is a Retrieval\u2011Augmented Generation (RAG) system that "
-        "ingests 10\u2011K annual reports from major public companies, indexes "
-        "them at page level, and answers natural\u2011language financial "
-        "questions with grounded, source\u2011cited, explainable responses."
+        "**Lexio** is a **PageIndex RAG** that indexes and cites documents at "
+        "**page\u2011level granularity**. Every answer includes exact page numbers "
+        "(e.g., *NVIDIA 10\u2011K 2024, page 42*), so you can open the PDF and jump "
+        "straight to the cited location. It ingests 10\u2011K reports from NVIDIA, "
+        "Alphabet/Google, Apple, Microsoft, and Tesla, and answers natural\u2011language "
+        "financial questions with grounded, source\u2011cited responses."
     )
     st.markdown(
-        "- Semantic search across all indexed documents.\n"
-        "- Answers always include citations with page references.\n"
-        "- Supports multi\u2011step comparative questions "
-        "(e.g., revenue comparisons)."
+        "- **Intelligent retrieval** \u2014 semantic search with metadata filtering by "
+        "company, fiscal year, and document type.\n"
+        "- **Explainable responses** \u2014 citations with filename, page, relevance "
+        "score, and text snippet.\n"
+        "- **Multi\u2011step reasoning** \u2014 comparative queries are decomposed into "
+        "sub\u2011questions, resolved independently, and merged.\n"
+        "- **Financial visualization** \u2014 automatic table extraction and bar charts."
     )
+    st.caption("Built for Netcompany Hackathon Thessaloniki 2026 \u2014 Challenge 2: AI-Powered Knowledge Base.")
     if st.button("Got it", type="primary", use_container_width=True):
         st.rerun()
 
@@ -295,12 +302,14 @@ def _ingestion_status_banner():
     try:
         r = requests.get(f"{BACKEND_URL}/ingest/status", timeout=3)
         if r.status_code == 200:
-            state = r.json().get("state", "idle")
+            data = r.json()
+            state = data.get("state", "idle")
             if state == "running":
+                pct = data.get("progress_pct", 0)
                 st.info(
-                    "Index warming up \u2014 documents are being loaded "
-                    "in the background. You can still use the app."
+                    f"Index warming up \u2014 embedding documents\u2026 {pct:.0f}%"
                 )
+                st.progress(min(pct / 100.0, 1.0))
             else:
                 st.session_state._ingest_settled = True
     except Exception:

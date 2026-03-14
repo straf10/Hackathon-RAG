@@ -6,8 +6,10 @@ import threading
 from pathlib import Path
 
 from llama_index.core import StorageContext, VectorStoreIndex
+from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.vector_stores.chroma import ChromaVectorStore
+from pydantic import PrivateAttr
 
 from ..config import settings
 from ..utils.chroma import COLLECTION_NAME, connect_chroma
@@ -19,6 +21,73 @@ logger = logging.getLogger(__name__)
 _FINGERPRINT_FILE = settings.APP_DATA_DIR / "corpus_fingerprint.json"
 
 _ingest_lock = threading.Lock()
+
+
+class ProgressReportingEmbedding(BaseEmbedding):
+    """Transparent wrapper that reports embedding progress to a shared dict.
+
+    Delegates every embedding call to the wrapped model while updating
+    ``status["progress_pct"]`` after each batch.  Progress is capped at
+    ``max_pct`` (default 95%) so the caller can reserve the last slice
+    for post-embedding work (index save, fingerprint write, etc.).
+    """
+
+    _inner: BaseEmbedding = PrivateAttr()
+    _status: dict = PrivateAttr()
+    _total: int = PrivateAttr()
+    _processed: int = PrivateAttr(default=0)
+    _max_pct: float = PrivateAttr(default=95.0)
+
+    def __init__(
+        self,
+        inner: BaseEmbedding,
+        status: dict,
+        total_chunks: int,
+        max_pct: float = 95.0,
+        **kwargs,
+    ):
+        super().__init__(
+            model_name=getattr(inner, "model_name", "progress-wrapper"),
+            embed_batch_size=inner.embed_batch_size,
+            callback_manager=inner.callback_manager,
+            **kwargs,
+        )
+        self._inner = inner
+        self._status = status
+        self._total = max(total_chunks, 1)
+        self._processed = 0
+        self._max_pct = max_pct
+
+    def _update_progress(self, n: int = 1) -> None:
+        self._processed += n
+        raw = (self._processed / self._total) * self._max_pct
+        self._status["progress_pct"] = min(round(raw, 1), self._max_pct)
+
+    def _get_text_embedding(self, text: str) -> list[float]:
+        result = self._inner._get_text_embedding(text)
+        self._update_progress(1)
+        return result
+
+    def _get_text_embeddings(self, texts: list[str]) -> list[list[float]]:
+        results = self._inner._get_text_embeddings(texts)
+        self._update_progress(len(texts))
+        return results
+
+    def _get_query_embedding(self, query: str) -> list[float]:
+        return self._inner._get_query_embedding(query)
+
+    async def _aget_text_embedding(self, text: str) -> list[float]:
+        result = await self._inner._aget_text_embedding(text)
+        self._update_progress(1)
+        return result
+
+    async def _aget_text_embeddings(self, texts: list[str]) -> list[list[float]]:
+        results = await self._inner._aget_text_embeddings(texts)
+        self._update_progress(len(texts))
+        return results
+
+    async def _aget_query_embedding(self, query: str) -> list[float]:
+        return await self._inner._aget_query_embedding(query)
 
 
 def _compute_corpus_fingerprint(data_dir: Path) -> str:
@@ -77,7 +146,9 @@ def enrich_metadata(documents: list) -> list:
     return documents
 
 
-def run_ingestion(force: bool = False) -> dict:
+def run_ingestion(force: bool = False, status: dict | None = None) -> dict:
+    if status is None:
+        status = {}
     if not _ingest_lock.acquire(blocking=False):
         logger.warning("Ingestion already in progress — skipping concurrent request")
         return {
@@ -88,12 +159,12 @@ def run_ingestion(force: bool = False) -> dict:
             "collection": COLLECTION_NAME,
         }
     try:
-        return _run_ingestion_locked(force)
+        return _run_ingestion_locked(force, status)
     finally:
         _ingest_lock.release()
 
 
-def _run_ingestion_locked(force: bool) -> dict:
+def _run_ingestion_locked(force: bool, status: dict) -> dict:
     chroma_collection, client = connect_chroma(
         settings.CHROMA_HOST, settings.CHROMA_PORT, COLLECTION_NAME,
     )
@@ -145,13 +216,20 @@ def _run_ingestion_locked(force: bool) -> dict:
 
     embed_model = get_embed_model()
 
+    progress_model = ProgressReportingEmbedding(
+        inner=embed_model,
+        status=status,
+        total_chunks=len(nodes),
+    )
+
     VectorStoreIndex(
         nodes,
         storage_context=storage_context,
-        embed_model=embed_model,
+        embed_model=progress_model,
     )
 
     _save_fingerprint(current_fp)
+    status["progress_pct"] = 100
 
     result = {
         "status": "ok",

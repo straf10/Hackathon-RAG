@@ -21,8 +21,9 @@ async def auto_ingest_on_startup() -> None:
     ``GET /ingest/status``.
     """
     _auto_ingest_status["state"] = "running"
+    _auto_ingest_status["progress_pct"] = 0
     try:
-        result = await asyncio.to_thread(run_ingestion, False)
+        result = await asyncio.to_thread(run_ingestion, False, _auto_ingest_status)
         _auto_ingest_status["state"] = (
             "skipped" if result.get("status") == "skipped" else "done"
         )
@@ -43,8 +44,9 @@ async def ingest_status():
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest(request: IngestRequest | None = None):
     force = request.force if request else False
+    _auto_ingest_status.update({"state": "running", "progress_pct": 0})
     try:
-        result = await asyncio.to_thread(run_ingestion, force)
+        result = await asyncio.to_thread(run_ingestion, force, _auto_ingest_status)
     except FileNotFoundError:
         logger.warning("Ingestion failed: data directory not found")
         raise HTTPException(status_code=404, detail="Data directory not found.")
