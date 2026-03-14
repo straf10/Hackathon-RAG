@@ -18,12 +18,6 @@ from llama_index.core.query_engine import (
 from llama_index.core.question_gen import LLMQuestionGenerator
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.postprocessor import SimilarityPostprocessor
-from llama_index.core.vector_stores import (
-    FilterCondition,
-    FilterOperator,
-    MetadataFilter,
-    MetadataFilters,
-)
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from ..config import settings
@@ -114,83 +108,30 @@ class RAGEngine:
         logger.info("Reconnecting to ChromaDB (collection may have been recreated)")
         self._index = self._connect(self._chroma_host, self._chroma_port)
 
-    # -- metadata filtering -------------------------------------------------
-
-    @staticmethod
-    def _build_filters(
-        companies: list[str] | None = None,
-        years: list[int] | None = None,
-        doc_types: list[str] | None = None,
-    ) -> MetadataFilters | None:
-        """Construct metadata filters.
-
-        Filters are combined with AND: ``company IN [...]  AND  year IN [...]
-        AND  doc_type IN [...]``.
-        """
-        conditions: list[MetadataFilter] = []
-
-        if companies:
-            conditions.append(
-                MetadataFilter(
-                    key="company",
-                    value=[c.lower() for c in companies],
-                    operator=FilterOperator.IN,
-                )
-            )
-        if years:
-            conditions.append(
-                MetadataFilter(
-                    key="year",
-                    value=years,
-                    operator=FilterOperator.IN,
-                )
-            )
-        if doc_types:
-            conditions.append(
-                MetadataFilter(
-                    key="doc_type",
-                    value=[dt.upper() for dt in doc_types],
-                    operator=FilterOperator.IN,
-                )
-            )
-
-        if not conditions:
-            return None
-
-        return MetadataFilters(
-            filters=conditions,
-            condition=FilterCondition.AND,
-        )
-
     # -- query engines ------------------------------------------------------
 
     _SIMILARITY_CUTOFF = 0.70
 
     def _get_query_engine(
         self,
-        filters: MetadataFilters | None = None,
         similarity_top_k: int = 10,
         similarity_cutoff: float | None = None,
     ):
-        """Build a standard single-step query engine with optional
-        metadata pre-filtering and a cosine-similarity score threshold."""
+        """Build a standard single-step query engine with a
+        cosine-similarity score threshold."""
         cutoff = similarity_cutoff if similarity_cutoff is not None else self._SIMILARITY_CUTOFF
-        kwargs: dict = {
-            "llm": self.llm,
-            "similarity_top_k": similarity_top_k,
-            "node_postprocessors": [
+        return self._index.as_query_engine(
+            llm=self.llm,
+            similarity_top_k=similarity_top_k,
+            node_postprocessors=[
                 SimilarityPostprocessor(similarity_cutoff=cutoff),
             ],
-        }
-        if filters is not None:
-            kwargs["filters"] = filters
-        return self._index.as_query_engine(**kwargs)
+        )
 
     _RETRY_SIMILARITY_CUTOFF = 0.66
 
     def _get_sub_question_engine(
         self,
-        filters: MetadataFilters | None = None,
         similarity_top_k: int = 10,
     ):
         """``SubQuestionQueryEngine`` decomposes a complex question into
@@ -202,11 +143,9 @@ class RAGEngine:
         first queries at the default similarity cutoff and, if the response
         is empty, retries with a lower cutoff to broaden recall."""
         primary_engine = self._get_query_engine(
-            filters=filters,
             similarity_top_k=similarity_top_k,
         )
         fallback_engine = self._get_query_engine(
-            filters=filters,
             similarity_top_k=similarity_top_k,
             similarity_cutoff=self._RETRY_SIMILARITY_CUTOFF,
         )
@@ -239,9 +178,6 @@ class RAGEngine:
     def query(
         self,
         question: str,
-        companies: list[str] | None = None,
-        years: list[int] | None = None,
-        doc_types: list[str] | None = None,
         use_sub_questions: bool = True,
         similarity_top_k: int = 10,
     ) -> dict:
@@ -251,12 +187,6 @@ class RAGEngine:
         ----------
         question:
             Natural-language question.
-        companies:
-            Optional filter — e.g. ``["nvidia", "apple"]``.
-        years:
-            Optional filter — e.g. ``[2024, 2025]``.
-        doc_types:
-            Optional filter — e.g. ``["10-K", "10-Q"]``.
         use_sub_questions:
             Use ``SubQuestionQueryEngine`` for multi-step reasoning.
         similarity_top_k:
@@ -269,31 +199,25 @@ class RAGEngine:
             "score", "text_snippet"}, ...]}``
         """
         logger.info(
-            "Query: %r | companies=%s years=%s doc_types=%s sub_q=%s top_k=%d",
+            "Query: %r | sub_q=%s top_k=%d",
             question,
-            companies,
-            years,
-            doc_types,
             use_sub_questions,
             similarity_top_k,
         )
 
-        metadata_filters = self._build_filters(companies, years, doc_types)
-
         try:
             return self._execute_query(
-                question, metadata_filters, use_sub_questions, similarity_top_k,
+                question, use_sub_questions, similarity_top_k,
             )
         except chromadb.errors.NotFoundError:
             self._reconnect()
             return self._execute_query(
-                question, metadata_filters, use_sub_questions, similarity_top_k,
+                question, use_sub_questions, similarity_top_k,
             )
 
     def _execute_query(
         self,
         question: str,
-        metadata_filters: MetadataFilters | None,
         use_sub_questions: bool,
         similarity_top_k: int,
     ) -> dict:
@@ -302,7 +226,6 @@ class RAGEngine:
         if use_sub_questions:
             try:
                 engine = self._get_sub_question_engine(
-                    filters=metadata_filters,
                     similarity_top_k=similarity_top_k,
                 )
                 response = engine.query(question)
@@ -317,7 +240,6 @@ class RAGEngine:
                 )
 
         engine = self._get_query_engine(
-            filters=metadata_filters,
             similarity_top_k=similarity_top_k,
         )
         response = engine.query(question)

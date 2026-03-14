@@ -276,7 +276,7 @@ def _help_dialog():
         "questions with grounded, source\u2011cited, explainable responses."
     )
     st.markdown(
-        "- Semantic search with company/year filters.\n"
+        "- Semantic search across all indexed documents.\n"
         "- Answers always include citations with page references.\n"
         "- Supports multi\u2011step comparative questions "
         "(e.g., revenue comparisons)."

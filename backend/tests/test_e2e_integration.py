@@ -185,8 +185,6 @@ class TestFullApiFlow:
                 "/query",
                 json={
                     "question": "What was NVIDIA total revenue in 2025?",
-                    "companies": ["nvidia"],
-                    "years": [2025],
                     "use_sub_questions": True,
                 },
             )

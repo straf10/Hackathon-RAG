@@ -25,14 +25,6 @@ class TestQueryRequest:
         req = QueryRequest(question="Revenue?")
         assert req.use_sub_questions is True
 
-    def test_default_companies_none(self):
-        req = QueryRequest(question="Revenue?")
-        assert req.companies is None
-
-    def test_default_years_none(self):
-        req = QueryRequest(question="Revenue?")
-        assert req.years is None
-
     # -- question length boundaries --
     def test_min_length_question(self):
         req = QueryRequest(question="Q")
@@ -64,39 +56,6 @@ class TestQueryRequest:
         with pytest.raises(ValidationError):
             QueryRequest(question=12345)
 
-    # -- companies / years filters --
-    def test_companies_list_accepted(self):
-        req = QueryRequest(question="Q", companies=["nvidia", "apple"])
-        assert req.companies == ["nvidia", "apple"]
-
-    def test_years_list_accepted(self):
-        req = QueryRequest(question="Q", years=[2024, 2025])
-        assert req.years == [2024, 2025]
-
-    def test_empty_companies_list_accepted(self):
-        req = QueryRequest(question="Q", companies=[])
-        assert req.companies == []
-
-    def test_empty_years_list_accepted(self):
-        req = QueryRequest(question="Q", years=[])
-        assert req.years == []
-
-    def test_companies_max_length_boundary(self):
-        req = QueryRequest(question="Q", companies=["c"] * 10)
-        assert len(req.companies) == 10
-
-    def test_companies_over_max_rejected(self):
-        with pytest.raises(ValidationError):
-            QueryRequest(question="Q", companies=["c"] * 11)
-
-    def test_years_max_length_boundary(self):
-        req = QueryRequest(question="Q", years=list(range(10)))
-        assert len(req.years) == 10
-
-    def test_years_over_max_rejected(self):
-        with pytest.raises(ValidationError):
-            QueryRequest(question="Q", years=list(range(11)))
-
     # -- use_sub_questions --
     def test_explicit_false_honored(self):
         req = QueryRequest(question="Q", use_sub_questions=False)
@@ -104,7 +63,7 @@ class TestQueryRequest:
 
     # -- JSON round-trip --
     def test_json_round_trip(self):
-        req = QueryRequest(question="Test?", companies=["nvidia"], years=[2024])
+        req = QueryRequest(question="Test?", use_sub_questions=False)
         data = req.model_dump()
         restored = QueryRequest.model_validate(data)
         assert restored == req

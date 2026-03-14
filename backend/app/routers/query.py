@@ -95,9 +95,6 @@ async def query(request: QueryRequest):
         result = await asyncio.to_thread(
             engine.query,
             question=request.question,
-            companies=request.companies,
-            years=request.years,
-            doc_types=request.doc_types,
             use_sub_questions=request.use_sub_questions,
         )
     except Exception as exc:
@@ -121,9 +118,9 @@ async def query(request: QueryRequest):
     if not answer or answer.strip().lower() in ("empty response", "none", ""):
         answer = (
             "I don't have enough information in the ingested 10-K documents "
-            "to answer this question. Try rephrasing, adjusting the company/"
-            "year filters, or asking something related to the financial "
-            "filings (revenue, expenses, risk factors, etc.)."
+            "to answer this question. Try rephrasing or asking something "
+            "related to the financial filings (revenue, expenses, risk "
+            "factors, etc.)."
         )
 
     sources = [

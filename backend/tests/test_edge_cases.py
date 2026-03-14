@@ -112,82 +112,6 @@ class TestQueryMalformedInput:
         resp = _client.post(_URL, json={"question": "x" * 2001})
         assert resp.status_code == 422
 
-    def test_companies_wrong_type_returns_422(self):
-        resp = _client.post(
-            _URL,
-            json={"question": "Q", "companies": "nvidia"},
-        )
-        assert resp.status_code == 422
-
-    def test_years_wrong_type_returns_422(self):
-        resp = _client.post(
-            _URL,
-            json={"question": "Q", "years": "2024"},
-        )
-        assert resp.status_code == 422
-
-    def test_companies_too_many_returns_422(self):
-        resp = _client.post(
-            _URL,
-            json={"question": "Q", "companies": ["c"] * 11},
-        )
-        assert resp.status_code == 422
-
-    def test_years_too_many_returns_422(self):
-        resp = _client.post(
-            _URL,
-            json={"question": "Q", "years": list(range(11))},
-        )
-        assert resp.status_code == 422
-
-
-# ===========================================================================
-# Query with companies/years passthrough
-# ===========================================================================
-class TestQueryFilterPassthrough:
-    @patch("app.routers.query.persist_usage")
-    @patch("app.routers.query.get_engine")
-    @patch("app.routers.query.get_usage", return_value=_GOOD_USAGE)
-    @patch("app.routers.query.has_valid_openai_key", return_value=True)
-    def test_companies_passed_to_engine(self, _k, _u, mock_eng, _p):
-        engine = MagicMock()
-        engine.query.return_value = {"answer": "A", "source_nodes": []}
-        mock_eng.return_value = engine
-        _client.post(
-            _URL,
-            json={"question": "Q", "companies": ["nvidia", "apple"]},
-        )
-        kwargs = engine.query.call_args.kwargs
-        assert kwargs["companies"] == ["nvidia", "apple"]
-
-    @patch("app.routers.query.persist_usage")
-    @patch("app.routers.query.get_engine")
-    @patch("app.routers.query.get_usage", return_value=_GOOD_USAGE)
-    @patch("app.routers.query.has_valid_openai_key", return_value=True)
-    def test_years_passed_to_engine(self, _k, _u, mock_eng, _p):
-        engine = MagicMock()
-        engine.query.return_value = {"answer": "A", "source_nodes": []}
-        mock_eng.return_value = engine
-        _client.post(
-            _URL,
-            json={"question": "Q", "years": [2024, 2025]},
-        )
-        kwargs = engine.query.call_args.kwargs
-        assert kwargs["years"] == [2024, 2025]
-
-    @patch("app.routers.query.persist_usage")
-    @patch("app.routers.query.get_engine")
-    @patch("app.routers.query.get_usage", return_value=_GOOD_USAGE)
-    @patch("app.routers.query.has_valid_openai_key", return_value=True)
-    def test_none_filters_passed_when_omitted(self, _k, _u, mock_eng, _p):
-        engine = MagicMock()
-        engine.query.return_value = {"answer": "A", "source_nodes": []}
-        mock_eng.return_value = engine
-        _client.post(_URL, json={"question": "Q"})
-        kwargs = engine.query.call_args.kwargs
-        assert kwargs["companies"] is None
-        assert kwargs["years"] is None
-
 
 # ===========================================================================
 # Query ID is always returned
@@ -308,10 +232,6 @@ class TestQueryRequestEdgeCases:
     def test_special_characters_in_question(self):
         req = QueryRequest(question="Revenue > $10B? (2024)")
         assert req.question == "Revenue > $10B? (2024)"
-
-    def test_years_with_float_coerced(self):
-        req = QueryRequest(question="Q", years=[2024.0])
-        assert req.years == [2024]
 
     def test_extra_fields_ignored(self):
         req = QueryRequest.model_validate(

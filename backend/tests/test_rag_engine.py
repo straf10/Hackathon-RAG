@@ -1,5 +1,4 @@
-"""Tests for RAGEngine internals: metadata filter building and response
-formatting.
+"""Tests for RAGEngine internals: response formatting.
 
 These tests exercise static/class methods that do not require a live
 ChromaDB or OpenAI connection.
@@ -7,82 +6,7 @@ ChromaDB or OpenAI connection.
 
 from unittest.mock import MagicMock
 
-import pytest
-from llama_index.core.vector_stores import FilterCondition, FilterOperator
-
 from app.services.rag_engine import RAGEngine
-
-
-# ===========================================================================
-# _build_filters
-# ===========================================================================
-class TestBuildFilters:
-    def test_no_filters_returns_none(self):
-        assert RAGEngine._build_filters() is None
-
-    def test_no_filters_empty_lists_returns_none(self):
-        assert RAGEngine._build_filters(companies=[], years=[]) is None
-
-    def test_companies_only(self):
-        f = RAGEngine._build_filters(companies=["nvidia"])
-        assert f is not None
-        assert len(f.filters) == 1
-        assert f.filters[0].key == "company"
-        assert f.filters[0].operator == FilterOperator.IN
-        assert "nvidia" in f.filters[0].value
-
-    def test_years_only(self):
-        f = RAGEngine._build_filters(years=[2024, 2025])
-        assert f is not None
-        assert len(f.filters) == 1
-        assert f.filters[0].key == "year"
-        assert 2024 in f.filters[0].value
-
-    def test_both_companies_and_years(self):
-        f = RAGEngine._build_filters(
-            companies=["nvidia", "apple"], years=[2024]
-        )
-        assert f is not None
-        assert len(f.filters) == 2
-        assert f.condition == FilterCondition.AND
-
-    def test_companies_lowercased(self):
-        f = RAGEngine._build_filters(companies=["NVIDIA", "Apple"])
-        assert f.filters[0].value == ["nvidia", "apple"]
-
-    def test_none_companies_ignored(self):
-        f = RAGEngine._build_filters(companies=None, years=[2025])
-        assert len(f.filters) == 1
-        assert f.filters[0].key == "year"
-
-    def test_none_years_ignored(self):
-        f = RAGEngine._build_filters(companies=["google"], years=None)
-        assert len(f.filters) == 1
-        assert f.filters[0].key == "company"
-
-    def test_doc_types_only(self):
-        f = RAGEngine._build_filters(doc_types=["10-K"])
-        assert f is not None
-        assert len(f.filters) == 1
-        assert f.filters[0].key == "doc_type"
-        assert f.filters[0].operator == FilterOperator.IN
-        assert "10-K" in f.filters[0].value
-
-    def test_doc_types_uppercased(self):
-        f = RAGEngine._build_filters(doc_types=["10-k", "10-q"])
-        assert f.filters[0].value == ["10-K", "10-Q"]
-
-    def test_all_three_filters(self):
-        f = RAGEngine._build_filters(
-            companies=["nvidia"], years=[2024], doc_types=["10-K", "10-Q"]
-        )
-        assert f is not None
-        assert len(f.filters) == 3
-        assert f.condition == FilterCondition.AND
-
-    def test_empty_doc_types_ignored(self):
-        f = RAGEngine._build_filters(doc_types=[])
-        assert f is None
 
 
 # ===========================================================================

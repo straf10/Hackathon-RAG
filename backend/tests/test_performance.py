@@ -90,8 +90,6 @@ class TestQueryLatency:
             _URL,
             json={
                 "question": "Compare NVIDIA and Apple revenue in 2024",
-                "companies": ["nvidia", "apple"],
-                "years": [2024],
                 "use_sub_questions": True,
             },
         )
