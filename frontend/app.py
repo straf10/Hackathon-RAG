@@ -301,17 +301,29 @@ def _ingestion_status_banner():
         return
     try:
         r = requests.get(f"{BACKEND_URL}/ingest/status", timeout=3)
-        if r.status_code == 200:
-            data = r.json()
-            state = data.get("state", "idle")
-            if state == "running":
-                pct = data.get("progress_pct", 0)
-                st.info(
-                    f"Index warming up \u2014 embedding documents\u2026 {pct:.0f}%"
-                )
-                st.progress(min(pct / 100.0, 1.0))
-            else:
-                st.session_state._ingest_settled = True
+        if r.status_code != 200:
+            return
+        data = r.json()
+        state = data.get("state", "idle")
+        if state == "running":
+            pct = data.get("progress_pct", 0)
+            st.info(
+                f"Index warming up \u2014 embedding documents\u2026 {pct:.0f}%"
+            )
+            st.progress(min(pct / 100.0, 1.0))
+        elif state == "done":
+            detail = data.get("detail", {})
+            st.success(
+                f"Ingestion complete \u2014 "
+                f"{detail.get('documents_loaded', 0)} documents, "
+                f"{detail.get('chunks_created', 0)} chunks."
+            )
+            st.session_state._ingest_settled = True
+        elif state == "error":
+            st.error("Ingestion failed \u2014 check backend logs.")
+            st.session_state._ingest_settled = True
+        else:
+            st.session_state._ingest_settled = True
     except Exception:
         pass
 
@@ -555,46 +567,23 @@ elif st.session_state.page == "load_documents":
     st.header("Load Documents")
     st.caption("Ingest 10-K annual reports into the knowledge base")
 
-    force = st.checkbox(
-        "Force reload",
-        value=False,
-        key="ld_force",
-        help="Rebuild the index even if documents were already loaded.",
-    )
-
-    if st.button("Load Documents", type="primary", key="btn_load"):
-        with st.spinner("Loading documents\u2026"):
-            try:
-                r = requests.post(
-                    f"{BACKEND_URL}/ingest",
-                    json={"force": force},
-                    timeout=600,
-                )
-                if r.status_code == 200:
-                    data = r.json()
-                    if data.get("status") == "skipped":
-                        st.info(
-                            f"Documents already loaded "
-                            f"({data.get('existing_chunks', 0)} chunks). "
-                            f"Enable **Force reload** to re-index."
-                        )
-                    else:
-                        st.success(
-                            f"Loaded {data.get('documents_processed', 0)} "
-                            f"documents \u2014 "
-                            f"{data.get('chunks_created', 0)} chunks created."
-                        )
-                else:
-                    st.error(
-                        f"Loading failed: {r.status_code} \u2014 "
-                        f"{r.text[:200]}"
-                    )
-            except requests.ConnectionError:
-                st.error("Cannot reach the backend. Is it running?")
-            except requests.Timeout:
-                st.error("Loading timed out.")
-            except Exception as exc:
-                st.error(f"Loading failed: {exc}")
+    if st.button("Reload Documents", type="primary", key="btn_load"):
+        try:
+            requests.post(
+                f"{BACKEND_URL}/ingest",
+                json={"force": True},
+                timeout=(5, 0.5),
+            )
+        except requests.ConnectionError:
+            st.error("Cannot reach the backend. Is it running?")
+            st.stop()
+        except (requests.Timeout, requests.ReadTimeout):
+            pass
+        except Exception as exc:
+            st.error(f"Failed to trigger ingestion: {exc}")
+            st.stop()
+        st.session_state._ingest_settled = False
+        st.rerun()
 
     st.divider()
     st.subheader("Available Documents")

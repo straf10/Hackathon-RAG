@@ -47,14 +47,21 @@ async def ingest(request: IngestRequest | None = None):
     _auto_ingest_status.update({"state": "running", "progress_pct": 0})
     try:
         result = await asyncio.to_thread(run_ingestion, force, _auto_ingest_status)
+        _auto_ingest_status["state"] = (
+            "skipped" if result.get("status") == "skipped" else "done"
+        )
+        _auto_ingest_status["detail"] = result
     except FileNotFoundError:
         logger.warning("Ingestion failed: data directory not found")
+        _auto_ingest_status["state"] = "error"
         raise HTTPException(status_code=404, detail="Data directory not found.")
     except ValueError:
         logger.warning("Ingestion failed: no valid documents")
+        _auto_ingest_status["state"] = "error"
         raise HTTPException(status_code=400, detail="No valid PDF documents found.")
     except Exception:
         logger.exception("Ingestion failed")
+        _auto_ingest_status["state"] = "error"
         raise HTTPException(
             status_code=500,
             detail="An internal error occurred during ingestion.",
