@@ -144,6 +144,9 @@ def enrich_metadata(documents: list) -> list:
     for doc in documents:
         file_path = doc.metadata.get("file_path", "")
         doc.metadata.update(_extract_metadata(file_path))
+        # Normalize page_label from PyMuPDF's "source" so retrieval can cite pages
+        if "source" in doc.metadata and "page_label" not in doc.metadata:
+            doc.metadata["page_label"] = doc.metadata["source"]
     return documents
 
 

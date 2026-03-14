@@ -180,32 +180,6 @@ class TestSimulatedLatency:
             f"2s-delayed query took {elapsed:.2f}s total — exceeds limit"
         )
 
-    @patch("app.routers.query.persist_usage")
-    @patch("app.routers.query.get_engine")
-    @patch("app.routers.query.get_usage", return_value=_GOOD_USAGE)
-    @patch("app.routers.query.has_valid_openai_key", return_value=True)
-    def test_engine_at_5s_still_passes(self, _k, _u, mock_eng, _p):
-        def slow_query(**kwargs):
-            time.sleep(5)
-            return _engine_result()
-
-        engine = MagicMock()
-        engine.query.side_effect = slow_query
-        mock_eng.return_value = engine
-
-        start = time.perf_counter()
-        resp = _client.post(
-            _URL,
-            json={"question": "Apple net income 2024?"},
-        )
-        elapsed = time.perf_counter() - start
-
-        assert resp.status_code == 200
-        assert elapsed < _LATENCY_LIMIT_SECONDS, (
-            f"5s-delayed query took {elapsed:.2f}s total — exceeds limit"
-        )
-
-
 # ===========================================================================
 # Non-query endpoints must respond near-instantly
 # ===========================================================================

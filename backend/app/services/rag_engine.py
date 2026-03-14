@@ -63,9 +63,10 @@ class RetryOnEmptyQueryEngine(CustomQueryEngine):
 
     @staticmethod
     def _is_empty(response) -> bool:
-        nodes = getattr(response, "source_nodes", [])
-        answer = str(response).strip().lower()
-        return not nodes or answer in _EMPTY_ANSWERS
+        return (
+            not getattr(response, "source_nodes", [])
+            or str(response).strip().lower() in _EMPTY_ANSWERS
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -249,37 +250,18 @@ class RAGEngine:
 
     @staticmethod
     def _format_response(response) -> dict:
-        """Extract the answer string and source-node metadata into a
-        serialisable dict suitable for API responses."""
+        """Extract answer and source-node metadata into a serialisable dict."""
         source_nodes: list[dict] = []
         for node in getattr(response, "source_nodes", []):
             meta = node.metadata or {}
-            has_file = bool(
-                meta.get("source_file") or meta.get("file_name")
-            )
+            has_file = bool(meta.get("source_file") or meta.get("file_name"))
             text = (node.text or "")[:500]
-            is_sub_q = (
-                not has_file
-                and text.lower().startswith("sub question:")
-            )
-
-            source_nodes.append(
-                {
-                    "filename": meta.get(
-                        "source_file", meta.get("file_name", "unknown")
-                    ),
-                    "page_label": meta.get(
-                        "page_label", str(meta.get("page", "N/A"))
-                    ),
-                    "score": (
-                        round(node.score, 4) if node.score is not None else None
-                    ),
-                    "text_snippet": text,
-                    "source_type": "sub_question" if is_sub_q else "document",
-                }
-            )
-
-        return {
-            "answer": str(response),
-            "source_nodes": source_nodes,
-        }
+            is_sub_q = not has_file and text.lower().startswith("sub question:")
+            source_nodes.append({
+                "filename": meta.get("source_file", meta.get("file_name", "unknown")),
+                "page_label": meta.get("page_label", str(meta.get("page", meta.get("source", "N/A")))),
+                "score": round(node.score, 4) if node.score is not None else None,
+                "text_snippet": text,
+                "source_type": "sub_question" if is_sub_q else "document",
+            })
+        return {"answer": str(response), "source_nodes": source_nodes}

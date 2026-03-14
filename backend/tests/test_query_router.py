@@ -161,16 +161,11 @@ class TestQueryNoApiKey:
 # Integration — /query: budget exhausted
 # ===========================================================================
 class TestQueryBudgetExhausted:
+    @pytest.mark.parametrize("usage", [_ZERO_USAGE, _NEGATIVE_USAGE])
     @patch("app.routers.query.has_valid_openai_key", return_value=True)
-    @patch("app.routers.query.get_usage", return_value=_ZERO_USAGE)
-    def test_zero_budget_returns_message(self, _u, _k):
-        resp = _client.post(_URL, json=_PAYLOAD)
-        assert resp.status_code == 200
-        assert resp.json()["answer"] == _BUDGET_EXHAUSTED_MSG
-
-    @patch("app.routers.query.has_valid_openai_key", return_value=True)
-    @patch("app.routers.query.get_usage", return_value=_NEGATIVE_USAGE)
-    def test_negative_budget_returns_message(self, _u, _k):
+    @patch("app.routers.query.get_usage")
+    def test_exhausted_budget_returns_message(self, mock_usage, _k, usage):
+        mock_usage.return_value = usage
         resp = _client.post(_URL, json=_PAYLOAD)
         assert resp.status_code == 200
         assert resp.json()["answer"] == _BUDGET_EXHAUSTED_MSG

@@ -45,7 +45,7 @@ _RATE_LIMIT_MSG = (
 
 
 def _safe_int(value) -> int:
-    """Convert *value* to int, returning 0 for anything non-numeric."""
+    """Convert value to int; return 0 for non-numeric."""
     try:
         return int(value)
     except (ValueError, TypeError):
@@ -131,7 +131,7 @@ async def query(request: QueryRequest):
             text_snippet=s.get("text_snippet", ""),
             source_type=s.get("source_type", "document"),
         )
-        for s in result.get("source_nodes", [])
+        for s in (result.get("source_nodes") or [])
     ]
 
     return QueryResponse(answer=answer, sources=sources, query_id=query_id)

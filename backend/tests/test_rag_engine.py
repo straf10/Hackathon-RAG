@@ -103,6 +103,17 @@ class TestFormatResponse:
         result = RAGEngine._format_response(resp)
         assert result["source_nodes"][0]["page_label"] == "7"
 
+    def test_page_label_from_source_key(self):
+        """PyMuPDFReader stores page number in 'source'; ensure we use it."""
+        node = self._make_node(
+            metadata={"source_file": "nvidia_2024.pdf", "source": "42"},
+        )
+        resp = MagicMock()
+        resp.source_nodes = [node]
+        resp.__str__ = lambda self: "Answer"
+        result = RAGEngine._format_response(resp)
+        assert result["source_nodes"][0]["page_label"] == "42"
+
     def test_no_source_nodes_attribute(self):
         class BareResponse:
             def __str__(self):

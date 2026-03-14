@@ -146,7 +146,6 @@ def _parse_row(match: re.Match) -> tuple[str, float] | None:
     open_paren = match.group(2)
     raw_num = match.group(3)
     close_paren = match.group(4)
-    _pct = match.group(5)
     suffix = (match.group(6) or "").lower()
 
     try:

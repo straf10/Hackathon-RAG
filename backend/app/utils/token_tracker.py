@@ -25,11 +25,11 @@ from ..config import settings as app_settings
 
 logger = logging.getLogger(__name__)
 
-# ---- pricing (USD per 1 M tokens) ----------------------------------------
-_LLM_INPUT_COST = 2.5      # gpt-4.1 input
-_LLM_OUTPUT_COST = 8.00       # gpt-4.1 output
-_EMBED_COST = 0.02            # text-embedding-3-small
-_BUDGET_USD = 10.00
+# ---- pricing (USD per 1M tokens) ----------------------------------------
+_LLM_INPUT_COST = 2.5
+_LLM_OUTPUT_COST = 8.0
+_EMBED_COST = 0.02
+_BUDGET_USD = 10.0
 
 # ---- persistence ----------------------------------------------------------
 _USAGE_FILE = Path(app_settings.APP_DATA_DIR) / "token_usage.json"

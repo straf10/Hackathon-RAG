@@ -7,7 +7,6 @@ extraction from filenames.
 
 from unittest.mock import patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -71,15 +70,9 @@ class TestIngestSuccess:
 
     @patch("app.routers.ingest.persist_usage")
     @patch("app.routers.ingest.run_ingestion", return_value=_ok_result())
-    def test_no_body_accepted(self, _run, _persist):
-        resp = _client.post(_URL)
-        assert resp.status_code == 200
-
-    @patch("app.routers.ingest.persist_usage")
-    @patch("app.routers.ingest.run_ingestion", return_value=_ok_result())
-    def test_empty_json_accepted(self, _run, _persist):
-        resp = _client.post(_URL, json={})
-        assert resp.status_code == 200
+    def test_optional_body_accepted(self, _run, _persist):
+        for kwargs in ({}, {"json": {}}):
+            assert _client.post(_URL, **kwargs).status_code == 200
 
 
 # ===========================================================================
@@ -218,3 +211,18 @@ class TestEnrichMetadata:
         result = enrich_metadata(docs)
         assert result[0].metadata["company"] == ""
         assert result[0].metadata["year"] == 0
+
+    def test_page_label_from_pymupdf_source(self):
+        """Normalize page_label from PyMuPDFReader's 'source' key."""
+        doc = self._make_doc("data/nvidia/10k_2024.pdf")
+        doc.metadata["source"] = "17"
+        result = enrich_metadata([doc])
+        assert result[0].metadata["page_label"] == "17"
+
+    def test_page_label_not_overwritten_when_present(self):
+        """Existing page_label takes precedence over source."""
+        doc = self._make_doc("data/nvidia/10k_2024.pdf")
+        doc.metadata["page_label"] = "i"
+        doc.metadata["source"] = "17"
+        result = enrich_metadata([doc])
+        assert result[0].metadata["page_label"] == "i"

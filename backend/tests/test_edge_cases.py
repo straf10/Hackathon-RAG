@@ -4,12 +4,12 @@ Validates that the API and schemas handle boundary conditions, null inputs,
 type mismatches, and malformed data gracefully.
 """
 
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
 from app.models.schemas import QueryRequest
 from app.routers.query import _is_mock_output, _safe_int, router as query_router
@@ -132,7 +132,6 @@ class TestQueryIdPresence:
         engine.query.return_value = {"answer": "A", "source_nodes": []}
         mock_eng.return_value = engine
         body = _client.post(_URL, json={"question": "Q"}).json()
-        import uuid
         uuid.UUID(body["query_id"])
 
 

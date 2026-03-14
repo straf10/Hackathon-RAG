@@ -22,14 +22,9 @@ class TestRoot:
         resp = _client.get("/")
         assert resp.status_code == 200
 
-    def test_body_has_message_key(self):
+    def test_body_has_nonempty_message(self):
         body = _client.get("/").json()
-        assert "message" in body
-
-    def test_message_is_nonempty_string(self):
-        body = _client.get("/").json()
-        assert isinstance(body["message"], str)
-        assert len(body["message"]) > 0
+        assert "message" in body and isinstance(body["message"], str) and len(body["message"]) > 0
 
 
 # ===========================================================================
