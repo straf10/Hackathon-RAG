@@ -117,9 +117,9 @@ async def query(request: QueryRequest):
 
     if not answer or answer.strip().lower() in ("empty response", "none", ""):
         answer = (
-            "I don't have enough information in the ingested 10-K documents "
-            "to answer this question. Try rephrasing or asking something "
-            "related to the financial filings (revenue, expenses, risk "
+            "I don't have enough information in the ingested financial "
+            "documents to answer this question. Try rephrasing or asking "
+            "something related to the documents (revenue, expenses, risk "
             "factors, etc.)."
         )
 

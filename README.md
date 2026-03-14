@@ -2,11 +2,11 @@
 
 ## What This Project Does
 
-Financial analysts spend hours manually searching through SEC 10-K filings — documents that routinely exceed 200 pages — to extract revenue figures, risk factors, segment breakdowns, and year-over-year comparisons. The information is buried across disparate sections, inconsistent formatting, and legal boilerplate.
+Financial analysts spend hours manually searching through financial documents — SEC filings, annual reports, and similar materials that routinely exceed hundreds of pages — to extract revenue figures, risk factors, segment breakdowns, and year-over-year comparisons. The information is buried across disparate sections, inconsistent formatting, and legal boilerplate.
 
-**Lexio** is a **PageIndex RAG** — a Retrieval-Augmented Generation system that indexes and cites documents at **page-level granularity**. Unlike typical RAG systems that chunk by fixed token windows (e.g., 512 tokens) and often cite vague "document X" references, PageIndex RAG keeps every chunk tied to its source page. Each answer includes **exact page numbers** (e.g., *"NVIDIA 10-K 2024, page 42"*), so analysts can open the PDF and jump straight to the cited location instead of hunting through hundreds of pages.
+**Lexio** is a **PageIndex RAG** — a Retrieval-Augmented Generation system for financial documents that indexes and cites at **page-level granularity**. Unlike typical RAG systems that chunk by fixed token windows (e.g., 512 tokens) and often cite vague "document X" references, PageIndex RAG keeps every chunk tied to its source page. Each answer includes **exact page numbers** (e.g., *"NVIDIA Annual Report 2024, page 42"*), so analysts can open the PDF and jump straight to the cited location instead of hunting through hundreds of pages.
 
-Lexio ingests 10-K annual reports from major public companies (NVIDIA, Alphabet/Google, Apple, Microsoft, Tesla) and answers natural-language financial questions with **grounded, source-cited, explainable responses**. Instead of sifting through thousands of pages, analysts simply ask a question — *"Compare NVIDIA and Google revenue for 2024 and 2025"* — and receive a structured answer with exact page references, relevance scores, and automatic data visualizations. Complex comparative queries are decomposed into sub-questions behind the scenes, each resolved independently and merged into a coherent response.
+Lexio ingests financial PDFs and answers natural-language financial questions with **grounded, source-cited, explainable responses**. Instead of sifting through thousands of pages, analysts simply ask a question — *"Compare NVIDIA and Google revenue for 2024 and 2025"* — and receive a structured answer with exact page references, relevance scores, and automatic data visualizations. Complex comparative queries are decomposed into sub-questions behind the scenes, each resolved independently and merged into a coherent response.
 
 The system provides intelligent retrieval with metadata filtering, explainable responses with source citations, and multi-step reasoning for comparative queries.
 
@@ -17,7 +17,7 @@ Built for **Netcompany Hackathon Thessaloniki 2026** — Challenge 2: AI-Powered
 ## Architecture
 
 ```mermaid
-graph LR
+graph TB
     User((User)) --> UI
 
     subgraph Frontend["Streamlit :8501"]
@@ -32,10 +32,10 @@ graph LR
     end
 
     subgraph ChromaDB["ChromaDB :8100"]
-        VDB[("financial_10k")]
+        VDB[("financial_docs")]
     end
 
-    Data[("15 × 10-K PDFs")]
+    Data[("Financial PDFs")]
     OpenAI["OpenAI API"]
 
     UI -->|"/query"| API
@@ -119,7 +119,7 @@ On first launch, the backend automatically ingests all 15 PDFs in the background
 ### Simple questions
 
 - *What was NVIDIA's total revenue in fiscal year 2024?*
-- *What are the main risk factors mentioned in NVIDIA's 10-K?*
+- *What are the main risk factors mentioned in NVIDIA's annual report?*
 - *How many employees does Apple have?*
 
 ### Complex questions (multi-step reasoning is automatic)
@@ -134,7 +134,7 @@ On first launch, the backend automatically ingests all 15 PDFs in the background
 
 ## How It Works
 
-1. **Ingestion** — 10-K PDFs are parsed page-by-page with PyMuPDF, split into chunks (1 536 tokens, 256-token overlap), and tagged with metadata (company, year, document type, source file).
+1. **Ingestion** — Financial PDFs are parsed page-by-page with PyMuPDF, split into chunks (1 536 tokens, 256-token overlap), and tagged with metadata (company, year, document type, source file).
 2. **Embedding** — Each chunk is embedded using OpenAI `text-embedding-3-small` and stored in ChromaDB.
 3. **Retrieval** — When you ask a question, the most relevant chunks are retrieved via semantic similarity search with optional metadata filters.
 4. **Synthesis** — The LLM (GPT-4.1) answers using only the retrieved context and returns citations (file + page).
@@ -159,7 +159,9 @@ On first launch, the backend automatically ingests all 15 PDFs in the background
 
 ## Data Corpus
 
-Fifteen 10-K annual reports from SEC EDGAR, covering five companies across three fiscal years:
+Lexio is designed for financial documents in general (SEC filings, annual reports, prospectuses, etc.). The current demo corpus uses **15 10-K annual reports** from SEC EDGAR — limited to this subset for hackathon constraints (time and resources). You can add other financial PDFs to `data/` and re-ingest.
+
+**Current demo corpus** — five companies across three fiscal years:
 
 | Company           | FY 2023        | FY 2024        | FY 2025        |
 | ----------------- | -------------- | -------------- | -------------- |
@@ -196,7 +198,7 @@ For full request/response schemas, see [Project_Specification.md §6](Project_Sp
 | `OPENAI_API_KEY`  | `""`                    | OpenAI API key. Without a valid `sk-` key, the system falls back to MockLLM/MockEmbedding. |
 | `CHROMA_HOST`     | `localhost`             | ChromaDB hostname. Set to `chromadb` inside Docker.                                        |
 | `CHROMA_PORT`     | `8100`                  | ChromaDB port. Set to `8000` inside Docker (internal port).                                |
-| `DATA_DIR`        | (auto-detected)         | Path to the `data/` directory containing 10-K PDFs. Set to `/app/data` in Docker.          |
+| `DATA_DIR`        | (auto-detected)         | Path to the `data/` directory containing financial PDFs. Set to `/app/data` in Docker.      |
 | `APP_DATA_DIR`    | `app_data/`             | Path for token usage persistence and corpus fingerprint. Set to `/app/app_data` in Docker. |
 | `BACKEND_URL`     | `http://localhost:8000` | Backend URL used by the Streamlit frontend. Set to `http://backend:8000` in Docker.        |
 
@@ -231,4 +233,4 @@ For detailed test coverage by spec requirement, see [Project_Specification.md §
 
 ## License
 
-Built for Netcompany Hackathon Thessaloniki 2026. All 10-K documents sourced from [SEC EDGAR](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany) (public domain).
+Built for Netcompany Hackathon Thessaloniki 2026. Demo corpus sourced from [SEC EDGAR](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany) (public domain).

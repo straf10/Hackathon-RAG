@@ -1,6 +1,6 @@
 """
 RAG Engine — LlamaIndex retrieval-augmented generation pipeline for
-financial 10-K filings stored in ChromaDB.
+financial documents stored in ChromaDB.
 
 Falls back to MockLLM / MockEmbedding when no OPENAI_API_KEY is set so the
 module remains importable and runnable without credentials.
@@ -74,7 +74,7 @@ class RetryOnEmptyQueryEngine(CustomQueryEngine):
 
 
 class RAGEngine:
-    """High-level interface for querying the financial 10-K vector store."""
+    """High-level interface for querying the financial document vector store."""
 
     def __init__(
         self,
@@ -158,10 +158,10 @@ class RAGEngine:
             metadata=ToolMetadata(
                 name="sec_financial_filings",
                 description=(
-                    "SEC financial filings (10-K, 10-Q, DEF 14A, and other "
-                    "forms) for publicly traded companies.  Covers revenue, "
-                    "expenses, net income, risk factors, segment data, and "
-                    "other financial metrics across multiple fiscal years."
+                    "Financial documents (SEC filings, annual reports, "
+                    "prospectuses, etc.) for publicly traded companies.  Covers "
+                    "revenue, expenses, net income, risk factors, segment data, "
+                    "and other financial metrics across multiple fiscal years."
                 ),
             ),
         )

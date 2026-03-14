@@ -1,4 +1,4 @@
-"""Lexio — 10-K Financial Knowledge Base frontend.
+"""Lexio — Financial Document Knowledge Base frontend.
 
 Single-page Streamlit app with custom sidebar navigation.
 Pages: Chat (App), Analytics, Load Documents.
@@ -51,7 +51,7 @@ def _escape_dollars(text: str) -> str:
 # Page configuration
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Lexio — 10-K Analysis",
+    page_title="Lexio — Financial Analysis",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -565,7 +565,7 @@ elif st.session_state.page == "analytics":
 # ── PAGE: Load Documents ──────────────────────────────────────────────────
 elif st.session_state.page == "load_documents":
     st.header("Load Documents")
-    st.caption("Ingest 10-K annual reports into the knowledge base")
+    st.caption("Ingest financial documents into the knowledge base")
 
     if st.button("Reload Documents", type="primary", key="btn_load"):
         try:
@@ -586,7 +586,10 @@ elif st.session_state.page == "load_documents":
         st.rerun()
 
     st.divider()
-    st.subheader("Available Documents")
+    st.subheader("Current Demo Corpus")
+    st.caption(
+        "Lexio supports any financial PDFs. The demo uses 10-K reports (hackathon corpus)."
+    )
     st.markdown(
         "| Company | FY 2023 | FY 2024 | FY 2025 |\n"
         "|---------|---------|---------|---------|\n"
