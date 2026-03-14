@@ -149,16 +149,16 @@ class TestIngestRequest:
 # ===========================================================================
 class TestIngestResponse:
     def test_minimal(self):
-        resp = IngestResponse(status="ok", documents_processed=6, chunks_created=796)
+        resp = IngestResponse(status="ok", documents_processed=6, chunks_created=1200)
         assert resp.existing_chunks == 0
 
     def test_skipped_status(self):
         resp = IngestResponse(
             status="skipped", documents_processed=0, chunks_created=0,
-            existing_chunks=796,
+            existing_chunks=1200,
         )
         assert resp.status == "skipped"
-        assert resp.existing_chunks == 796
+        assert resp.existing_chunks == 1200
 
     def test_missing_required_field_rejected(self):
         with pytest.raises(ValidationError):

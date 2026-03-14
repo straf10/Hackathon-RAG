@@ -161,7 +161,7 @@ class TestFullApiFlow:
         mock_ingest.return_value = {
             "status": "ok",
             "documents_loaded": 6,
-            "chunks_created": 796,
+            "chunks_created": 1200,
             "existing_chunks": 0,
             "collection": "financial_10k",
         }
@@ -172,7 +172,7 @@ class TestFullApiFlow:
         ingest_body = resp.json()
         assert ingest_body["status"] == "ok"
         assert ingest_body["documents_processed"] == 6
-        assert ingest_body["chunks_created"] == 796
+        assert ingest_body["chunks_created"] == 1200
         assert "existing_chunks" in ingest_body
 
         # Step 2: Query

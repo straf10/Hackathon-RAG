@@ -28,7 +28,7 @@ Lexio addresses each challenge requirement as follows:
 
 | Challenge Requirement | Lexio Implementation |
 | --------------------- | --------------------- |
-| **Ingest and structure knowledge** from documents, APIs, or provided data sources | Recursive PDF ingestion from `data/` directory; PyMuPDF parses financial documents page-by-page; structured chunks with metadata (company, year, doc_type, source_file). |
+| **Ingest and structure knowledge** from documents, APIs, or provided data sources | Recursive PDF ingestion from `data/` directory; PyMuPDF parses financial documents page-by-page; one indexed unit per page with metadata (company, year, doc_type, source_file). |
 | **Natural language querying** with relevant, explainable responses | Natural-language questions via chat UI; metadata filtering by company and fiscal year; structured responses with source citations (filename, page number, relevance score, text snippet). |
 | **Learn from user interactions**, refining relevance or summaries over time | Token usage tracking and budget enforcement; corpus fingerprint enables smart re-ingestion when documents change; design supports future feedback loops (extensible). |
 | **Semantic search or RAG** for grounded answers | LlamaIndex RAG pipeline with OpenAI embeddings; ChromaDB vector store for semantic retrieval; retrieval-augmented generation ensures answers cite source pages. |

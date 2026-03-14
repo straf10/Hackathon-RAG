@@ -316,7 +316,7 @@ def _ingestion_status_banner():
             st.success(
                 f"Ingestion complete \u2014 "
                 f"{detail.get('documents_loaded', 0)} documents, "
-                f"{detail.get('chunks_created', 0)} chunks."
+                f"{detail.get('chunks_created', 0)} pages indexed."
             )
             st.session_state._ingest_settled = True
         elif state == "error":

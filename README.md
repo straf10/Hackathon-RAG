@@ -52,6 +52,8 @@ graph TB
     style OpenAI fill:#412057,stroke:#e94560,color:#fff
 ```
 
+
+
 ---
 
 ## Key Features
@@ -98,15 +100,18 @@ That's it — all three services (backend, frontend, vector database) start auto
 
 ### 3. Open the app
 
-| Service  | URL                        |
-| -------- | -------------------------- |
-| Frontend | `http://localhost:8501`    |
-| Backend  | `http://localhost:8000`    |
-| ChromaDB | `http://localhost:8100`    |
+
+| Service  | URL                     |
+| -------- | ----------------------- |
+| Frontend | `http://localhost:8501` |
+| Backend  | `http://localhost:8000` |
+| ChromaDB | `http://localhost:8100` |
+
 
 On first launch, the backend automatically ingests all 15 PDFs in the background. A banner in the UI shows progress — you can start chatting immediately and results improve once indexing completes.
 
 > **Tip (Windows/PowerShell):** Speed up subsequent builds by enabling BuildKit:
+>
 > ```powershell
 > $env:DOCKER_BUILDKIT = "1"
 > $env:COMPOSE_DOCKER_CLI_BUILD = "1"
@@ -134,9 +139,9 @@ On first launch, the backend automatically ingests all 15 PDFs in the background
 
 ## How It Works
 
-1. **Ingestion** — Financial PDFs are parsed page-by-page with PyMuPDF, split into chunks (1 536 tokens, 256-token overlap), and tagged with metadata (company, year, document type, source file).
-2. **Embedding** — Each chunk is embedded using OpenAI `text-embedding-3-small` and stored in ChromaDB.
-3. **Retrieval** — When you ask a question, the most relevant chunks are retrieved via semantic similarity search with optional metadata filters.
+1. **Ingestion** — Financial PDFs are parsed page-by-page with PyMuPDF. Each page becomes one indexed unit (no token splitting), tagged with metadata (company, year, document type, source file). Pages exceeding 8 191 tokens are truncated for embedding-model compatibility.
+2. **Embedding** — Each page is embedded using OpenAI `text-embedding-3-small` and stored in ChromaDB.
+3. **Retrieval** — When you ask a question, the most relevant pages are retrieved via semantic similarity search with optional metadata filters.
 4. **Synthesis** — The LLM (GPT-4.1) answers using only the retrieved context and returns citations (file + page).
 5. **Sub-questions** — For comparative queries, the system decomposes the question into independent sub-questions, resolves each separately, and merges the answers.
 
@@ -144,16 +149,18 @@ On first launch, the backend automatically ingests all 15 PDFs in the background
 
 ## Tech Stack
 
+
 | Layer            | Technology                      | Role                                               |
 | ---------------- | ------------------------------- | -------------------------------------------------- |
 | Backend          | Python 3.12 + FastAPI           | Async REST API                                     |
-| RAG Framework    | LlamaIndex                      | Document ingestion, chunking, retrieval, synthesis  |
-| LLM              | OpenAI `gpt-4.1`                | Answer generation from retrieved context            |
-| Embeddings       | OpenAI `text-embedding-3-small` | Dense vector generation (1 536 dims)                |
-| Vector Database  | ChromaDB                        | Persistent vector storage with metadata index       |
-| PDF Parsing      | PyMuPDF (`pymupdf`)             | Page-level text extraction                          |
-| Frontend         | Streamlit                       | Chat interface with filters, citations, charts      |
-| Containerization | Docker Compose                  | Three-service orchestration                         |
+| RAG Framework    | LlamaIndex                      | Document ingestion, chunking, retrieval, synthesis |
+| LLM              | OpenAI `gpt-4.1`                | Answer generation from retrieved context           |
+| Embeddings       | OpenAI `text-embedding-3-small` | Dense vector generation (1 536 dims)               |
+| Vector Database  | ChromaDB                        | Persistent vector storage with metadata index      |
+| PDF Parsing      | PyMuPDF (`pymupdf`)             | Page-level text extraction                         |
+| Frontend         | Streamlit                       | Chat interface with filters, citations, charts     |
+| Containerization | Docker Compose                  | Three-service orchestration                        |
+
 
 ---
 
@@ -163,6 +170,7 @@ Lexio is designed for financial documents in general (SEC filings, annual report
 
 **Current demo corpus** — five companies across three fiscal years:
 
+
 | Company           | FY 2023        | FY 2024        | FY 2025        |
 | ----------------- | -------------- | -------------- | -------------- |
 | NVIDIA            | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
@@ -171,35 +179,39 @@ Lexio is designed for financial documents in general (SEC filings, annual report
 | Microsoft         | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
 | Tesla             | `10k_2023.pdf` | `10k_2024.pdf` | `10k_2025.pdf` |
 
+
 All documents are publicly available and stored in the `data/` directory, organized by company subdirectory.
 
 ---
 
 ## API Reference
 
-| Method | Path               | Description                                                            |
-| ------ | ------------------ | ---------------------------------------------------------------------- |
-| `GET`  | `/`                | Health message                                                         |
-| `GET`  | `/health`          | Health check                                                           |
-| `GET`  | `/usage`           | API token usage and estimated cost                                     |
-| `GET`  | `/ingest/status`   | Auto-ingestion status used by the frontend banner                      |
-| `POST` | `/query`           | Execute a RAG query (429 if budget exhausted; 422 if validation fails) |
-| `POST` | `/ingest`          | Trigger document ingestion (returns `already_running` if concurrent)   |
-| `POST` | `/shutdown`        | Persist data before stopping containers                                |
+
+| Method | Path             | Description                                                            |
+| ------ | ---------------- | ---------------------------------------------------------------------- |
+| `GET`  | `/`              | Health message                                                         |
+| `GET`  | `/health`        | Health check                                                           |
+| `GET`  | `/usage`         | API token usage and estimated cost                                     |
+| `GET`  | `/ingest/status` | Auto-ingestion status used by the frontend banner                      |
+| `POST` | `/query`         | Execute a RAG query (429 if budget exhausted; 422 if validation fails) |
+| `POST` | `/ingest`        | Trigger document ingestion (returns `already_running` if concurrent)   |
+| `POST` | `/shutdown`      | Persist data before stopping containers                                |
 
 
 ---
 
 ## Environment Variables
 
-| Variable          | Default                 | Description                                                                                |
-| ----------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
-| `OPENAI_API_KEY`  | `""`                    | OpenAI API key. Without a valid `sk-` key, the system falls back to MockLLM/MockEmbedding. |
-| `CHROMA_HOST`     | `localhost`             | ChromaDB hostname. Set to `chromadb` inside Docker.                                        |
-| `CHROMA_PORT`     | `8100`                  | ChromaDB port. Set to `8000` inside Docker (internal port).                                |
-| `DATA_DIR`        | (auto-detected)         | Path to the `data/` directory containing financial PDFs. Set to `/app/data` in Docker.      |
-| `APP_DATA_DIR`    | `app_data/`             | Path for token usage persistence and corpus fingerprint. Set to `/app/app_data` in Docker. |
-| `BACKEND_URL`     | `http://localhost:8000` | Backend URL used by the Streamlit frontend. Set to `http://backend:8000` in Docker.        |
+
+| Variable         | Default                 | Description                                                                                |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| `OPENAI_API_KEY` | `""`                    | OpenAI API key. Without a valid `sk-` key, the system falls back to MockLLM/MockEmbedding. |
+| `CHROMA_HOST`    | `localhost`             | ChromaDB hostname. Set to `chromadb` inside Docker.                                        |
+| `CHROMA_PORT`    | `8100`                  | ChromaDB port. Set to `8000` inside Docker (internal port).                                |
+| `DATA_DIR`       | (auto-detected)         | Path to the `data/` directory containing financial PDFs. Set to `/app/data` in Docker.     |
+| `APP_DATA_DIR`   | `app_data/`             | Path for token usage persistence and corpus fingerprint. Set to `/app/app_data` in Docker. |
+| `BACKEND_URL`    | `http://localhost:8000` | Backend URL used by the Streamlit frontend. Set to `http://backend:8000` in Docker.        |
+
 
 All environment variables are configured automatically in `docker-compose.yml`. The only manual step is creating the `.env` file with your OpenAI API key.
 
@@ -207,11 +219,13 @@ All environment variables are configured automatically in `docker-compose.yml`. 
 
 ## Docker Services
 
+
 | Service    | Image                                  | Ports     | Purpose                       |
 | ---------- | -------------------------------------- | --------- | ----------------------------- |
 | `backend`  | Build: `./backend` (python:3.12-slim)  | 8000:8000 | FastAPI REST API + RAG engine |
 | `frontend` | Build: `./frontend` (python:3.12-slim) | 8501:8501 | Streamlit chat interface      |
 | `chromadb` | `chromadb/chroma:1.5.2`                | 8100:8000 | Persistent vector database    |
+
 
 All services communicate over an internal Docker network. ChromaDB data persists in the `chroma_data` named volume. Application data (token usage, corpus fingerprint) persists in the `app_data` named volume.
 
@@ -225,7 +239,6 @@ The backend includes **203 automated tests** across 8 test files, runnable local
 cd backend
 python -m pytest tests/ -v
 ```
-
 
 ---
 

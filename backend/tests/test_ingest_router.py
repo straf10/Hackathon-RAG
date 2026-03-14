@@ -21,7 +21,7 @@ _client = TestClient(_app)
 _URL = "/ingest"
 
 
-def _ok_result(docs=6, chunks=796):
+def _ok_result(docs=6, chunks=1200):
     return {
         "status": "ok",
         "documents_loaded": docs,
@@ -31,7 +31,7 @@ def _ok_result(docs=6, chunks=796):
     }
 
 
-def _skipped_result(existing=796):
+def _skipped_result(existing=1200):
     return {
         "status": "skipped",
         "documents_loaded": 0,
@@ -67,7 +67,7 @@ class TestIngestSuccess:
         body = _client.post(_URL, json={"force": False}).json()
         assert body["status"] == "ok"
         assert body["documents_processed"] == 6
-        assert body["chunks_created"] == 796
+        assert body["chunks_created"] == 1200
 
     @patch("app.routers.ingest.persist_usage")
     @patch("app.routers.ingest.run_ingestion", return_value=_ok_result())
@@ -91,7 +91,7 @@ class TestIngestSkipped:
     def test_returns_skipped_status(self, _run, _persist):
         body = _client.post(_URL, json={"force": False}).json()
         assert body["status"] == "skipped"
-        assert body["existing_chunks"] == 796
+        assert body["existing_chunks"] == 1200
 
 
 # ===========================================================================
