@@ -187,7 +187,6 @@ All documents are publicly available and stored in the `data/` directory, organi
 | `POST` | `/ingest`          | Trigger document ingestion (returns `already_running` if concurrent)   |
 | `POST` | `/shutdown`        | Persist data before stopping containers                                |
 
-For full request/response schemas, see [Project_Specification.md §6](Project_Specification.md#6-api-contract).
 
 ---
 
@@ -227,7 +226,6 @@ cd backend
 python -m pytest tests/ -v
 ```
 
-For detailed test coverage by spec requirement, see [Project_Specification.md §13](Project_Specification.md#13-testing).
 
 ---
 
