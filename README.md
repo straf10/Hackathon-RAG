@@ -105,7 +105,7 @@ That's it — all three services (backend, frontend, vector database) start auto
 Wait for the frontend to appear in the terminal. When you see output like this, the app is ready:
 
 <p align="center">
-  <img src="images/XEtk1O.png" alt="Frontend ready in terminal" width="350" />
+  <img src="images/XEtk1O.png" alt="Frontend ready in terminal" width="800" />
 </p>
 
 Then open **`http://localhost:8501`** in your browser.
