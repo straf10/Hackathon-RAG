@@ -112,6 +112,18 @@ That's it — all three services (backend, frontend, vector database) start auto
 
 On first launch, the backend automatically ingests all 15 PDFs in the background. A banner in the UI shows progress — you can start chatting immediately and results improve once indexing completes.
 
+### 4. Stop the system
+
+```bash
+docker compose down
+```
+
+Or, to also remove volumes (ChromaDB data and app data):
+
+```bash
+docker compose down -v
+```
+
 > **Tip (Windows/PowerShell):** Speed up subsequent builds by enabling BuildKit:
 >
 > ```powershell
