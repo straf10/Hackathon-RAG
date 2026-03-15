@@ -125,15 +125,18 @@ On first launch, the backend automatically ingests all 15 PDFs in the background
 
 - *What was NVIDIA's total revenue in fiscal year 2024?*
 - *What are the main risk factors mentioned in NVIDIA's annual report?*
-- *How many employees does Apple have?*
-
-### Complex questions (multi-step reasoning is automatic)
-
-- *Compare Apple and Google's net income for 2025.*
-- *How did Alphabet's advertising revenue change between 2024 and 2025?*
-- *Compare NVIDIA and Google total revenue for 2024 and 2025.*
-- *Which company had higher R&D spend in 2024: NVIDIA or Alphabet?*
 - *How did Apple's net income change from 2024 to 2025?*
+- *Which company had higher R&D spend in 2024: NVIDIA or Alphabet?*
+
+### Complex questions (multi-step reasoning)
+
+- Compare **Apple** and **Microsoft** from **2023 through 2025** on **net income** and **operating margin**. Determine which company shows **more consistent profitability improvement** over the period (define consistency using the observed year‑to‑year movements), and cite the specific 10‑K explanations for the main drivers behind the margin/net income changes in each year.  
+
+- From **2023 to 2025**, track **Alphabet (Google) advertising revenue** and **Microsoft cloud revenue** (use the segment names as reported). Compute the **percentage growth** over 2023→2025 for each segment, determine which segment grew faster, and summarize the **drivers** each company attributes the growth (or slowdown) to, citing the relevant 10‑K passages across multiple years.  
+
+- Using **Tesla** and **NVIDIA** 10‑Ks for **2024 and 2025**, identify **three risk factor themes** that are **present in both companies** (e.g., supply chain, regulatory, competition—use the exact themes you find). For each theme, compare **how the emphasis changed from 2024 to 2025** within each company (what got stronger/weaker or newly highlighted), and support with citations from both years.  
+
+- Compare **total revenue** for **NVIDIA**, **Microsoft**, and **Alphabet (Google)** across **2023, 2024, and 2025**. For each company, compute **YoY growth** for 2023→2024 and 2024→2025, identify which year had the **higher YoY growth**, and cite the **specific driver(s)** each company attributes that change to in its 10‑K.
 
 ---
 
