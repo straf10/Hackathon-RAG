@@ -1,5 +1,7 @@
 # Lexio — PageIndex RAG for Financial Document Analysis
 
+**[▶ Watch Demo](https://www.youtube.com/watch?v=3dVU70Uv_Ko)**
+
 ## What This Project Does
 
 Financial analysts spend hours manually searching through financial documents — SEC filings, annual reports, and similar materials that routinely exceed hundreds of pages — to extract revenue figures, risk factors, segment breakdowns, and year-over-year comparisons. The information is buried across disparate sections, inconsistent formatting, and legal boilerplate.
