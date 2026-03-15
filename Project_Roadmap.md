@@ -2,71 +2,69 @@
 
 **Netcompany Hackathon Thessaloniki 2026**
 
-Due to the  time constraint and the $10 API token budget constraint across `gpt-5.1`, `gpt-4.1`, and `text-embedding-3-small`, we focused our MVP on the core innovation of **Lexio**: the **Page-Level Indexing architecture**. 
+Due to the time constraint and the $10 API token budget constraint across `gpt-5.1`, `gpt-4.1`, and `text-embedding-3-small`, we focused our MVP on the core innovation of **Lexio**: the **Page-Level Indexing architecture**. 
 
-While our current MVP successfully ingests fifteen 10-K reports and answers complex financial queries accurately within budget, this document outlines our complete vision, upcoming features, and the scientific justification behind our approach.
+While our current MVP successfully ingests fifteen 10-K reports and answers complex financial queries accurately within budget, this document outlines our complete vision, upcoming features, and the scientific justification behind our approach to scaling Lexio into an enterprise-grade product.
 
 ---
 
-## 1. The Full Vision: Future Features & Upgrades
+## 1. The Full Vision: Product Evolution 
 
-If given more time and a larger token budget, **Lexio** is designed to evolve into a full-scale investment and financial reporting analyst. Our immediate roadmap includes:
+If given more time and resources, **Lexio** is designed to evolve into a full-scale, deeply integrated investment analyst tool. Our roadmap focuses on seamless workflow integration and advanced financial logic:
 
-### Expanding the Financial Corpus & Predictive Insights
+### Deep Workflow Integration (Excel & Sheets Add-ins)
 
-Currently, the system is limited to 15 annual 10-K reports. 
+- **The Problem:** A standalone chat UI adds a step to the analyst's workflow rather than replacing manual work.
+- **The Upgrade:** Developing an Office Excel / Google Sheets Add-in. Analysts will be able to call Lexio directly from cells (e.g., `=LEXIO_QUERY("NVIDIA revenue 2024")`), returning structured financial values alongside citation metadata directly into their financial models.
 
-- **The Upgrade:** We plan to integrate quarterly **10-Q**, current event **8-K**, and proxy **DEF 14A** (DFA14A) reports across dozens of companies and a broader 5-10 year timeline. 
-- **The Value:** This will allow the LLM to identify deep historical patterns, evaluate sudden executive shifts, and perform cross-company trend analysis to actively recommend **where to invest** and automatically generate comprehensive **investment thesis reports**.
+### Advanced Financial Math & Derived Metrics
 
-### Advanced Financial Visualizations
+- **The Problem:** Currently, the system relies entirely on the LLM's internal capability to calculate implied metrics (e.g., Debt-to-Equity ratios), which is prone to hallucination.
+- **The Upgrade:** Introducing a **Financial Metric Layer** and a `ToolQueryEngine`. We will implement a two-phase retrieval process: semantic search retrieves the raw variables, and a deterministic compute tool executes standard financial formulas natively, ensuring 100% mathematical accuracy.
 
-- **The Upgrade:** Implementing dynamic line plots, candlestick charts, and multi-variable scatter plots directly in the chat UI.
-- **Why it was deferred:** Generating code for complex longitudinal graphs requires significantly larger context windows and multiple LLM reasoning passes. Due to our $10 token budget and API rate limits, we restricted the current MVP to simple bar charts and table extractions.
+### Expanding the Corpus & Handling "Non-Standard" Formats
+
+- **The Upgrade:** Beyond 10-K/10-Q SEC filings, we plan to support **Investor Decks (PPTX)** by treating each slide as a chunk, and **Earnings Call Transcripts** by indexing sections per speaker/quarter. 
+- **The Value:** This enables cross-referencing between official filings and executive commentary.
 
 ### Interactive "In-App" Document Verification
 
-- **The Upgrade:** Currently, Lexio provides exact page citations (e.g., *Page 42*). We plan to upgrade the UI so that clicking a citation triggers a **live PDF pop-up modal**. 
-- **The Value:** Using the document metadata, the app will instantly render the exact page of the original SEC filing on the user's screen, highlighting the exact paragraph or table the model used. This provides 100% frictionless auditability.
-
-### Personalized Workspaces via Firebase Auth
-
-- **The Upgrade:** Integration with Firebase Authentication.
-- **The Value:** Analysts will have secure, individualized accounts where their specific conversation threads, custom financial comparisons, and uploaded custom PDFs are saved persistently.
+- **The Upgrade:** Transforming citations into live PDF pop-up modals. Clicking a citation will instantly render the exact page of the original SEC filing, highlighting the exact paragraph or table the model used, providing 100% frictionless auditability.
 
 ---
 
-## 2. Why Page-Level Indexing?
+## 2. Architectural Defensibility: Evolving Page-Level Indexing
 
-Most standard RAG (Retrieval-Augmented Generation) applications use **Token-Based Chunking** (e.g., blindly splitting text every 512 tokens with a 100-token overlap). For financial documents, this is a fatal flaw. We built Lexio on **Page-Level Indexing**, a decision backed by recent AI research:
+We built Lexio on **Page-Level Indexing**. In NVIDIA's 2024 Retrieval Benchmark, page-level chunking outperformed all standard token-chunking methods for structured documents. However, to maintain a competitive moat as Long-Context LLMs (2M+ tokens) become the norm, we plan the following architectural upgrades:
 
-1. **NVIDIA's 2024 Retrieval Benchmark:** In a comprehensive study of chunking strategies, NVIDIA found that for highly structured documents, **page-level chunking outperformed all other methods**, achieving the highest QA accuracy and lowest hallucination rate.
-2. **Tabular Data Integrity:** Financial documents are heavily reliant on massive, multi-column tables (Income Statements, Balance Sheets). A 512-token limit regularly slices a financial table in half. The LLM retrieves a fragmented table, leading to hallucinations. **Page-level indexing preserves the semantic and structural layout** of the table natively.
-3. **The FinanceBench Standard:** Frameworks utilizing page-anchored structural retrieval (like the open-source *PageIndex* framework) have achieved up to **98.7% accuracy** on the rigorous FinanceBench dataset, vastly outperforming token-chunked vector RAGs on SEC filings.
+### Multi-Page Table Resolution & Adjacency Expansion
+
+- **The Limitation:** Currently, top-10 semantic search might retrieve page 43 of a table, but miss the header on page 42 or the footer on page 44.
+- **The Upgrade:** Implementing **Adjacent-Page Expansion**. When a page hits the top-k results, the system will automatically fetch ±1–2 neighboring pages via ChromaDB metadata filters and merge them. Combined with `TableNodeParser` integrations, Lexio will treat tables spanning multiple pages as single logical chunks.
+
+### Hybrid Retrieval & The Defensible Moat
+
+- **The Upgrade:** While raw context windows are growing, throwing 200 pages into a prompt is slow and expensive. Lexio’s moat will shift towards **auditability and precision**. We will implement **Hybrid Retrieval**, combining semantic vector search with keyword/BM25 indexing for exact numbers, tickers, and dates, augmented by strict Named Entity Recognition (NER) for lightning-fast metadata filtering.
 
 ---
 
-## 3. The "Efficiency Calculator"
+## 3. Enterprise Scalability, Cost & Compliance
 
-Currently, our application features a **Token Usage & Budget** tracker. Our planned upgrade is to replace this with a **Live Efficiency Calculator** that actively proves the ROI of our architecture to the user.
+Currently, our application relies on a hardcoded $10 token budget and direct OpenAI API calls. Scaling to enterprise usage requires shifting from a global cap to a multi-tenant ecosystem.
 
-Instead of just showing tokens spent, the dashboard will use a real-time formula to compare Lexio’s costs against a standard Vector RAG. 
+### Data Sovereignty & On-Premise Deployment
 
-### The Math Behind Our Efficiency
+- **The Problem:** Financial institutions deal with highly sensitive, pre-release data (M&A, non-public earnings) and cannot send documents to OpenAI.
+- **The Upgrade:** Introducing a **Provider Abstraction Layer**. We will build out integrations via LlamaCPP/Ollama and local embedding models (e.g., Sentence-Transformers). This allows Lexio to run entirely on-premise, utilizing open-weights models (Llama 3, Mistral) to meet strict FinServ compliance standards.
 
-Traditional token chunking requires "sliding overlaps" to prevent cutting sentences in half. 
+### Scalable Billing & Caching Mechanisms
 
-- **Standard Vector RAG:** `Total Chunks = Total Tokens ÷ (Chunk Size − Overlap Size)`
-- **Lexio (Page-Level):** `Total Chunks = Total Pages`
+- **The Upgrade:** Replacing the static budget with a **Tenant-Based Quota System** backed by Firebase Auth. Usage will be tracked per user/organization to support usage-based billing. Furthermore, we will implement **Embedding & Query Caching** to instantly serve identical comparative queries, drastically reducing API overhead at an enterprise scale.
 
-If an average 10-K page has ~800 tokens, a 512-token chunker with 20% overlap creates roughly **3 to 4 times more chunks** than Lexio. 
+### The Real-Time "Efficiency Calculator"
 
-**The Live Formula Dashboard will show:**
+- **The Value:** To prove Lexio's ROI, the enterprise dashboard will feature a live efficiency calculator. It will dynamically show **Embedding API Calls Saved** (Lexio reduces embedding requests by ~70% compared to 512-token chunkers) and **Zero Overlap Waste**, proving that Lexio operates at a fraction of the latency and cost of traditional Vector RAGs.
 
-1. **Embedding API Calls Saved:** Lexio reduces embedding model requests by ~70%.
-2. **Zero Overlap Waste:** Lexio wastes 0 tokens on redundant overlaps, whereas traditional RAGs pay for 15-25% redundant tokens on every document ingested.
-3. **Faster Search Latency:** By reducing a 10,000-vector database to a 2,500-vector database, the Approximate Nearest Neighbor (ANN) search in ChromaDB executes at a fraction of the latency.
+### Conclusion
 
-### Conclusion for the Judges
-
-Lexio is not just a wrapper around an OpenAI API. It is a highly optimized, domain-specific architecture designed to maximize accuracy on financial tables while simultaneously minimizing API costs. We accomplished a highly accurate, multi-step comparative financial analyst while remaining strictly under the $10 threshold.
+Lexio is not just a wrapper around an OpenAI API. It is a highly optimized, domain-specific architecture. We have anticipated the scaling roadblocks—from multi-page table fragmentation to enterprise data privacy—and have mapped out a robust, technically sound path to evolve this MVP into an indispensable, natively integrated financial analyst platform.

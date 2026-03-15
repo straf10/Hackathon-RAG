@@ -12,6 +12,8 @@ The system provides intelligent retrieval with metadata filtering, explainable r
 
 Built for **Netcompany Hackathon Thessaloniki 2026** — Challenge 2: AI-Powered Knowledge Base.
 
+For a deeper dive into how this MVP scales into an enterprise-ready product—including Excel integrations, multi-page table resolution, and on-premise data compliance—please read our [Vision & Project Roadmap](Project_Roadmap.md).
+
 ---
 
 ## Architecture
